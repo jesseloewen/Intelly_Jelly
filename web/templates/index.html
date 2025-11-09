@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intelly Jelly - Media Organizer</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🍇 Intelly Jelly</h1>
+            <p class="subtitle">Intelligent Media Organization</p>
+            <nav>
+                <a href="/" class="active">Dashboard</a>
+                <a href="/settings">Settings</a>
+            </nav>
+        </header>
+
+        <div class="stats-bar" id="stats">
+            <div class="stat-item">
+                <span class="stat-label">Queued:</span>
+                <span class="stat-value" id="stat-queued">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Processing:</span>
+                <span class="stat-value" id="stat-processing">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Pending:</span>
+                <span class="stat-value" id="stat-pending">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Completed:</span>
+                <span class="stat-value" id="stat-completed">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Failed:</span>
+                <span class="stat-value error" id="stat-failed">0</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="loadJobs()" class="btn btn-primary">🔄 Refresh</button>
+            <label>
+                <input type="checkbox" id="auto-refresh" checked>
+                Auto-refresh (every 3s)
+            </label>
+            <select id="status-filter" onchange="loadJobs()">
+                <option value="">All Jobs</option>
+                <option value="queued_for_ai">Queued for AI</option>
+                <option value="processing_ai">Processing</option>
+                <option value="pending_completion">Pending Move</option>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+            </select>
+        </div>
+
+        <div class="jobs-container" id="jobs-container">
+            <p class="loading">Loading jobs...</p>
+        </div>
+    </div>
+
+    <!-- Edit Job Modal -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeEditModal()">&times;</span>
+            <h2>Edit Job</h2>
+            <form id="edit-form" onsubmit="saveJobEdit(event)">
+                <input type="hidden" id="edit-job-id">
+                
+                <div class="form-group">
+                    <label>Original Filename:</label>
+                    <input type="text" id="edit-original" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label>New Filename:</label>
+                    <input type="text" id="edit-new-name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Subfolder:</label>
+                    <input type="text" id="edit-subfolder" placeholder="e.g., Movies/Action">
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">💾 Save</button>
+                    <button type="button" class="btn" onclick="closeEditModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Re-AI Modal -->
+    <div id="reai-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeReAIModal()">&times;</span>
+            <h2>Re-process with AI</h2>
+            <form id="reai-form" onsubmit="submitReAI(event)">
+                <input type="hidden" id="reai-job-id">
+                
+                <div class="form-group">
+                    <label>Original Filename:</label>
+                    <input type="text" id="reai-original" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="reai-use-default" checked>
+                        Include default instructions
+                    </label>
+                </div>
+                
+                <div class="form-group">
+                    <label>Custom Prompt (optional):</label>
+                    <textarea id="reai-prompt" rows="4" placeholder="Add any special instructions for the AI..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">🤖 Re-process</button>
+                    <button type="button" class="btn" onclick="closeReAIModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
