@@ -288,6 +288,211 @@
             font-size: 64px;
             margin-bottom: 20px;
         }
+        
+        /* Mobile Portrait Optimizations */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                max-width: 100%;
+            }
+            
+            header {
+                padding: 15px;
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            h1 {
+                font-size: 22px;
+            }
+            
+            .nav-links {
+                width: 100%;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            
+            .nav-links a {
+                padding: 8px 16px;
+                font-size: 14px;
+            }
+            
+            .stats {
+                padding: 15px;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+            }
+            
+            .stat-value {
+                font-size: 24px;
+            }
+            
+            .stat-label {
+                font-size: 12px;
+            }
+            
+            .jobs-container {
+                padding: 15px;
+                overflow-x: auto;
+            }
+            
+            .jobs-header {
+                flex-direction: column;
+                gap: 10px;
+                align-items: stretch;
+            }
+            
+            .jobs-header h2 {
+                font-size: 18px;
+                text-align: center;
+            }
+            
+            .refresh-btn {
+                width: 100%;
+            }
+            
+            .jobs-table {
+                font-size: 12px;
+                min-width: 600px;
+            }
+            
+            .jobs-table th,
+            .jobs-table td {
+                padding: 8px 6px;
+            }
+            
+            .status-badge {
+                font-size: 10px;
+                padding: 3px 8px;
+            }
+            
+            .actions {
+                flex-direction: column;
+                gap: 4px;
+            }
+            
+            .btn {
+                font-size: 11px;
+                padding: 5px 10px;
+                width: 100%;
+            }
+            
+            .modal-content {
+                width: 95%;
+                max-width: 95%;
+                padding: 20px;
+                max-height: 90vh;
+                overflow-y: auto;
+            }
+            
+            .modal-header h3 {
+                font-size: 18px;
+            }
+            
+            .form-group label {
+                font-size: 14px;
+            }
+            
+            .form-group input,
+            .form-group textarea {
+                font-size: 14px;
+            }
+            
+            .form-actions {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .btn-primary,
+            .btn-secondary {
+                width: 100%;
+                padding: 12px;
+            }
+            
+            .empty-state-icon {
+                font-size: 48px;
+            }
+        }
+        
+        /* Tablet and Small Desktop Optimizations */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .container {
+                max-width: 100%;
+            }
+            
+            header {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+            
+            .stats {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            
+            .jobs-container {
+                padding: 20px;
+            }
+            
+            .jobs-table {
+                font-size: 13px;
+            }
+            
+            .modal-content {
+                max-width: 600px;
+            }
+        }
+        
+        /* Large Desktop Optimizations */
+        @media (min-width: 1400px) {
+            .container {
+                max-width: 1600px;
+            }
+            
+            .stats {
+                grid-template-columns: repeat(6, 1fr);
+            }
+            
+            .jobs-table th,
+            .jobs-table td {
+                padding: 14px;
+            }
+        }
+        
+        /* Landscape Mobile Optimizations */
+        @media (max-width: 768px) and (orientation: landscape) {
+            body {
+                padding: 10px;
+            }
+            
+            header {
+                flex-direction: row;
+                padding: 10px 15px;
+            }
+            
+            h1 {
+                font-size: 20px;
+            }
+            
+            .stats {
+                grid-template-columns: repeat(3, 1fr);
+                padding: 10px;
+            }
+            
+            .stat-value {
+                font-size: 20px;
+            }
+            
+            .modal-content {
+                max-height: 85vh;
+            }
+        }
     </style>
 </head>
 <body>
@@ -369,26 +574,25 @@
                 <textarea id="reai-prompt" placeholder="Enter custom instructions for the AI..."></textarea>
             </div>
             <div class="form-group">
-                <label>
-                    <input type="checkbox" id="reai-include-instructions" checked>
-                    Include instructions.txt
-                </label>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="reai-include-filename" checked>
-                    Include original filename
-                </label>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="reai-web-search">
-                    Enable web search
-                </label>
+                <label style="font-weight: 600; margin-bottom: 10px; display: block;">AI Processing Options</label>
+                <div style="display: flex; flex-direction: column; gap: 8px; padding-left: 10px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="reai-include-instructions" checked style="cursor: pointer;">
+                        <span>Include instructions.txt</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="reai-include-filename" checked style="cursor: pointer;">
+                        <span>Include original filename</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="reai-web-search" style="cursor: pointer;">
+                        <span>Enable web search</span>
+                    </label>
+                </div>
             </div>
             <div class="form-actions">
                 <button class="btn-secondary" onclick="closeReAIModal()">Cancel</button>
-                <button class="btn-primary" onclick="saveReAI()">Process</button>
+                <button class="btn-primary" onclick="saveReAI()">Regen</button>
             </div>
         </div>
     </div>

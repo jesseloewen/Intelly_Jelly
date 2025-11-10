@@ -1,11 +1,23 @@
 from flask import Flask, render_template, request, jsonify
 import threading
 import os
+import logging
 
 from backend.config_manager import ConfigManager
 from backend.job_store import JobStore, JobStatus
 from backend.backend_orchestrator import BackendOrchestrator
 from backend.ai_processor import AIProcessor
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('intelly_jelly.log'),
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -47,33 +59,50 @@ def get_job(job_id):
 
 @app.route('/api/jobs/<job_id>/edit', methods=['POST'])
 def edit_job(job_id):
-    data = request.json
-    new_name = data.get('new_name')
-    new_path = data.get('new_path')
-    
-    if not new_name:
-        return jsonify({'error': 'new_name is required'}), 400
-    
-    success = orchestrator.manual_edit_job(job_id, new_name, new_path)
-    
-    if success:
-        return jsonify({'success': True, 'message': 'Job updated successfully'})
-    return jsonify({'error': 'Job not found'}), 404
+    logger.info(f"API: Edit job request for job_id={job_id}")
+    try:
+        data = request.json
+        new_name = data.get('new_name')
+        new_path = data.get('new_path')
+        logger.debug(f"Edit job data: new_name={new_name}, new_path={new_path}")
+        
+        if not new_name:
+            logger.warning(f"Edit job request missing new_name for job_id={job_id}")
+            return jsonify({'error': 'new_name is required'}), 400
+        
+        success = orchestrator.manual_edit_job(job_id, new_name, new_path)
+        
+        if success:
+            logger.info(f"Job {job_id} edited successfully")
+            return jsonify({'success': True, 'message': 'Job updated successfully'})
+        logger.warning(f"Job {job_id} not found for edit")
+        return jsonify({'error': 'Job not found'}), 404
+    except Exception as e:
+        logger.error(f"Error editing job {job_id}: {type(e).__name__}: {e}", exc_info=True)
+        return jsonify({'error': 'Internal server error'}), 500
 
 
 @app.route('/api/jobs/<job_id>/re-ai', methods=['POST'])
 def re_ai_job(job_id):
-    data = request.json
-    custom_prompt = data.get('custom_prompt')
-    include_instructions = data.get('include_instructions', True)
-    include_filename = data.get('include_filename', True)
-    enable_web_search = data.get('enable_web_search', False)
-    
-    success = orchestrator.re_ai_job(job_id, custom_prompt, include_instructions, include_filename, enable_web_search)
-    
-    if success:
-        return jsonify({'success': True, 'message': 'Job queued for re-processing'})
-    return jsonify({'error': 'Job not found'}), 404
+    logger.info(f"API: Re-AI job request for job_id={job_id}")
+    try:
+        data = request.json
+        custom_prompt = data.get('custom_prompt')
+        include_instructions = data.get('include_instructions', True)
+        include_filename = data.get('include_filename', True)
+        enable_web_search = data.get('enable_web_search', False)
+        logger.debug(f"Re-AI job data: custom_prompt={bool(custom_prompt)}, include_instructions={include_instructions}, include_filename={include_filename}, enable_web_search={enable_web_search}")
+        
+        success = orchestrator.re_ai_job(job_id, custom_prompt, include_instructions, include_filename, enable_web_search)
+        
+        if success:
+            logger.info(f"Job {job_id} queued for re-processing")
+            return jsonify({'success': True, 'message': 'Job queued for re-processing'})
+        logger.warning(f"Job {job_id} not found for re-AI")
+        return jsonify({'error': 'Job not found'}), 404
+    except Exception as e:
+        logger.error(f"Error re-processing job {job_id}: {type(e).__name__}: {e}", exc_info=True)
+        return jsonify({'error': 'Internal server error'}), 500
 
 
 @app.route('/api/config', methods=['GET'])
