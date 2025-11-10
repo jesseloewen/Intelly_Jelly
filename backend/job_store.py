@@ -28,6 +28,8 @@ class Job:
         self.updated_at = datetime.now()
         self.custom_prompt: Optional[str] = None
         self.priority: bool = False
+        self.include_instructions: bool = True
+        self.include_filename: bool = True
 
     def to_dict(self) -> dict:
         return {
