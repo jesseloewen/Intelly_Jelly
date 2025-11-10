@@ -173,10 +173,13 @@ class BackendOrchestrator:
                     
                     try:
                         custom_prompt = job.custom_prompt
+                        include_instructions = job.include_instructions
+                        include_filename = job.include_filename
                         results = self.ai_processor.process_batch(
                             [job.relative_path],
                             custom_prompt=custom_prompt,
-                            include_default=True
+                            include_default=include_instructions,
+                            include_filename=include_filename
                         )
                         
                         if results and len(results) > 0:
@@ -310,7 +313,7 @@ class BackendOrchestrator:
         
         return True
 
-    def re_ai_job(self, job_id: str, custom_prompt: Optional[str] = None):
+    def re_ai_job(self, job_id: str, custom_prompt: Optional[str] = None, include_instructions: bool = True, include_filename: bool = True):
         job = self.job_store.get_job(job_id)
         if not job:
             return False
@@ -319,7 +322,9 @@ class BackendOrchestrator:
             job_id,
             JobStatus.QUEUED_FOR_AI,
             custom_prompt=custom_prompt,
-            priority=True
+            priority=True,
+            include_instructions=include_instructions,
+            include_filename=include_filename
         )
         
         return True

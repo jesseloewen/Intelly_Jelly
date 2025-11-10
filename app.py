@@ -65,8 +65,10 @@ def edit_job(job_id):
 def re_ai_job(job_id):
     data = request.json
     custom_prompt = data.get('custom_prompt')
+    include_instructions = data.get('include_instructions', True)
+    include_filename = data.get('include_filename', True)
     
-    success = orchestrator.re_ai_job(job_id, custom_prompt)
+    success = orchestrator.re_ai_job(job_id, custom_prompt, include_instructions, include_filename)
     
     if success:
         return jsonify({'success': True, 'message': 'Job queued for re-processing'})

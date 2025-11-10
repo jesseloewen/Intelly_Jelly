@@ -16,7 +16,7 @@ class AIProcessor:
         except FileNotFoundError:
             return "Suggest improved file names for the following files. Return JSON array with original_path, suggested_name, and confidence (0-100)."
 
-    def _prepare_batch_prompt(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True) -> str:
+    def _prepare_batch_prompt(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True) -> str:
         base_instructions = self._get_instructions() if include_default else ""
         
         if custom_prompt:
@@ -24,19 +24,22 @@ class AIProcessor:
         else:
             prompt = f"{base_instructions}\n\n"
         
-        prompt += "Files to process:\n"
-        for path in file_paths:
-            prompt += f"- {path}\n"
+        if include_filename:
+            prompt += "Files to process:\n"
+            for path in file_paths:
+                prompt += f"- {path}\n"
+        else:
+            prompt += f"Number of files to process: {len(file_paths)}\n"
         
         return prompt
 
-    def process_batch_openai(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True) -> List[Dict]:
+    def process_batch_openai(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True) -> List[Dict]:
         api_key = self.config_manager.get_env('OPENAI_API_KEY')
         if not api_key:
             raise ValueError("OPENAI_API_KEY not found in environment")
         
         model = self.config_manager.get('AI_MODEL', 'gpt-3.5-turbo')
-        prompt = self._prepare_batch_prompt(file_paths, custom_prompt, include_default)
+        prompt = self._prepare_batch_prompt(file_paths, custom_prompt, include_default, include_filename)
         
         client = OpenAI(api_key=api_key)
         
@@ -64,13 +67,13 @@ class AIProcessor:
             print(f"OpenAI API error: {e}")
             raise
 
-    def process_batch_google(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True) -> List[Dict]:
+    def process_batch_google(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True) -> List[Dict]:
         api_key = self.config_manager.get_env('GOOGLE_API_KEY')
         if not api_key:
             raise ValueError("GOOGLE_API_KEY not found in environment")
         
         model = self.config_manager.get('AI_MODEL', 'gemini-pro')
-        prompt = self._prepare_batch_prompt(file_paths, custom_prompt, include_default)
+        prompt = self._prepare_batch_prompt(file_paths, custom_prompt, include_default, include_filename)
         
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         
@@ -115,10 +118,10 @@ class AIProcessor:
             print(f"Google API error: {e}")
             raise
 
-    def process_batch_ollama(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True) -> List[Dict]:
+    def process_batch_ollama(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True) -> List[Dict]:
         ollama_url = self.config_manager.get('OLLAMA_API_URL', 'http://localhost:11434')
         model = self.config_manager.get('AI_MODEL', 'llama3:latest')
-        prompt = self._prepare_batch_prompt(file_paths, custom_prompt, include_default)
+        prompt = self._prepare_batch_prompt(file_paths, custom_prompt, include_default, include_filename)
         
         url = f"{ollama_url}/api/generate"
         
@@ -149,15 +152,15 @@ class AIProcessor:
             print(f"Ollama API error: {e}")
             raise
 
-    def process_batch(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True) -> List[Dict]:
+    def process_batch(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True) -> List[Dict]:
         provider = self.config_manager.get('AI_PROVIDER', 'ollama')
         
         if provider == 'openai':
-            return self.process_batch_openai(file_paths, custom_prompt, include_default)
+            return self.process_batch_openai(file_paths, custom_prompt, include_default, include_filename)
         elif provider == 'google':
-            return self.process_batch_google(file_paths, custom_prompt, include_default)
+            return self.process_batch_google(file_paths, custom_prompt, include_default, include_filename)
         elif provider == 'ollama':
-            return self.process_batch_ollama(file_paths, custom_prompt, include_default)
+            return self.process_batch_ollama(file_paths, custom_prompt, include_default, include_filename)
         else:
             raise ValueError(f"Unknown AI provider: {provider}")
 

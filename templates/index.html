@@ -368,6 +368,18 @@
                 <label>Custom Prompt (optional)</label>
                 <textarea id="reai-prompt" placeholder="Enter custom instructions for the AI..."></textarea>
             </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="reai-include-instructions" checked>
+                    Include instructions.txt
+                </label>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="reai-include-filename" checked>
+                    Include original filename
+                </label>
+            </div>
             <div class="form-actions">
                 <button class="btn-secondary" onclick="closeReAIModal()">Cancel</button>
                 <button class="btn-primary" onclick="saveReAI()">Process</button>
@@ -524,6 +536,8 @@
         
         async function saveReAI() {
             const customPrompt = document.getElementById('reai-prompt').value;
+            const includeInstructions = document.getElementById('reai-include-instructions').checked;
+            const includeFilename = document.getElementById('reai-include-filename').checked;
             
             try {
                 const response = await fetch(`/api/jobs/${currentJobId}/re-ai`, {
@@ -532,7 +546,9 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        custom_prompt: customPrompt || null
+                        custom_prompt: customPrompt || null,
+                        include_instructions: includeInstructions,
+                        include_filename: includeFilename
                     })
                 });
                 
