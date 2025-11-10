@@ -1,7 +1,3 @@
-Here is the updated prompt. I've added a new rule (\#3) to the "General Rules" section to enforce a strict folder structure for media, moving extra information into the filename, and I've added examples to show this in practice.
-
------
-
 ### 1\. 🎯 Core Task & Output Format
 
 Your task is to process a given list of file paths and determine their **strictly correct full relative destination path** based on the organizational rules below.
