@@ -8,9 +8,10 @@ Intelly Jelly is a multi-threaded Python application that watches your download 
 
 ## ✨ Features
 
-- **🤖 AI-Powered Organization**: Uses Google Gemini AI to intelligently determine proper file names and folder structures
+- **🤖 AI-Powered Organization**: Supports both Google Gemini AI and local Ollama models to intelligently determine proper file names and folder structures
 - **👀 Real-Time Monitoring**: Automatically watches folders for new files and processes them in batches
-- **🌐 Web Search Integration**: Optional Google Search grounding for accurate information about movies, TV shows, music, and more
+- **🌐 Web Search Integration**: Optional Google Search grounding for accurate information about movies, TV shows, music, and more (Google AI only)
+- **🏠 Local AI Support**: Use Ollama for completely local, offline AI processing with configurable server address
 - **🎨 Beautiful Web UI**: Clean, responsive interface for monitoring jobs and managing settings
 - **⚡ Priority Queue System**: Manually re-process files with custom prompts and immediate priority
 - **🔧 Dynamic Configuration**: Update settings without restarting the application
@@ -27,7 +28,9 @@ Intelly Jelly is a multi-threaded Python application that watches your download 
 ### Prerequisites
 
 - Python 3.8 or higher
-- Google AI API Key ([Get one here](https://makersuite.google.com/app/apikey))
+- **AI Provider** (choose one):
+  - Google AI API Key ([Get one here](https://makersuite.google.com/app/apikey))
+  - **OR** Ollama running locally ([Install Ollama](https://ollama.ai/))
 
 ### Installation
 
@@ -44,20 +47,39 @@ Intelly Jelly is a multi-threaded Python application that watches your download 
 
 3. **Set up your environment**
    
-   Create a `.env` file in the root directory:
+   Create a `.env` file in the root directory (if using Google AI):
    ```env
    GOOGLE_API_KEY=your_api_key_here
    ```
 
-4. **Configure your paths**
+4. **Configure your paths and AI provider**
    
-   Edit `config.json` to set your folder paths:
+   Copy the example config and customize it:
+   ```bash
+   cp config.json.example config.json
+   ```
+   
+   **For Google AI (default):**
    ```json
    {
      "DOWNLOADING_PATH": "./test_folders/downloading",
      "COMPLETED_PATH": "./test_folders/completed",
      "LIBRARY_PATH": "./test_folders/library",
+     "AI_PROVIDER": "google",
+     "AI_MODEL": "gemini-2.0-flash-exp",
      "ENABLE_WEB_SEARCH": true
+   }
+   ```
+   
+   **For Ollama:**
+   ```json
+   {
+     "DOWNLOADING_PATH": "./test_folders/downloading",
+     "COMPLETED_PATH": "./test_folders/completed",
+     "LIBRARY_PATH": "./test_folders/library",
+     "AI_PROVIDER": "ollama",
+     "OLLAMA_BASE_URL": "http://localhost:11434",
+     "OLLAMA_MODEL": "llama2"
    }
    ```
 
@@ -148,17 +170,21 @@ Configure all aspects of the application:
 | `COMPLETED_PATH` | Folder where downloaded files appear | `./test_folders/completed` |
 | `LIBRARY_PATH` | Destination for organized files | `./test_folders/library` |
 | `INSTRUCTIONS_FILE_PATH` | Path to AI instruction file | `./instructions.md` |
+| `AI_PROVIDER` | AI provider to use (`google` or `ollama`) | `google` |
+| `AI_MODEL` | Google AI model name | `gemini-2.0-flash-exp` |
+| `OLLAMA_BASE_URL` | Ollama server address | `http://localhost:11434` |
+| `OLLAMA_MODEL` | Ollama model name | `llama2` |
 | `DEBOUNCE_SECONDS` | Wait time before batch processing | `5` |
 | `AI_BATCH_SIZE` | Number of files to process at once | `10` |
-| `AI_MODEL` | Google AI model to use | `gemini-2.0-flash-exp` |
 | `DRY_RUN_MODE` | Test without moving files | `false` |
-| `ENABLE_WEB_SEARCH` | Enable Google Search grounding | `true` |
+| `ENABLE_WEB_SEARCH` | Enable Google Search grounding (Google only) | `true` |
+| `AI_CALL_DELAY_SECONDS` | Delay between API calls to avoid rate limits | `2` |
 
 ### Environment Variables
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `GOOGLE_API_KEY` | Your Google AI API key | Yes |
+| `GOOGLE_API_KEY` | Your Google AI API key | Only when using Google AI |
 
 ---
 
@@ -211,6 +237,59 @@ Enable web search in:
 ---
 
 ## 🛠️ Advanced Usage
+
+### Using Ollama for Local AI
+
+Intelly Jelly supports [Ollama](https://ollama.ai/) for completely local, offline AI processing. This is perfect for:
+- Privacy-conscious users who want to keep all data local
+- Users without internet access or with limited bandwidth
+- Those who want to avoid API costs and rate limits
+
+**Setup Steps:**
+
+1. **Install Ollama**
+   ```bash
+   # Visit https://ollama.ai/ for installation instructions
+   # Or on Linux:
+   curl -fsSL https://ollama.ai/install.sh | sh
+   ```
+
+2. **Pull a model**
+   ```bash
+   ollama pull llama2
+   # Or try other models like: mistral, codellama, llama3
+   ```
+
+3. **Start Ollama** (if not already running)
+   ```bash
+   ollama serve
+   # By default runs on http://localhost:11434
+   ```
+
+4. **Configure Intelly Jelly**
+   
+   Edit your `config.json`:
+   ```json
+   {
+     "AI_PROVIDER": "ollama",
+     "OLLAMA_BASE_URL": "http://localhost:11434",
+     "OLLAMA_MODEL": "llama2"
+   }
+   ```
+
+5. **Run the application**
+   ```bash
+   python app.py
+   ```
+
+**Remote Ollama Server:**
+
+If Ollama is running on a different machine, simply update the `OLLAMA_BASE_URL`:
+```json
+{
+  "OLLAMA_BASE_URL": "http://192.168.1.100:11434"
+}
+```
 
 ### Custom Prompts
 
@@ -328,6 +407,7 @@ This project is provided as-is for personal use. See repository for license deta
 ## 🙏 Acknowledgments
 
 - **Google Gemini AI**: For powerful language understanding and generation
+- **Ollama**: For making local AI accessible and easy to use
 - **Flask**: For the lightweight web framework
 - **Watchdog**: For reliable file system monitoring
 - **Contributors**: Thanks to everyone who has contributed to this project
@@ -344,6 +424,7 @@ This project is provided as-is for personal use. See repository for license deta
 
 ## 🗺️ Roadmap
 
+- [x] Support for Ollama (local AI)
 - [ ] Support for additional AI providers (OpenAI, Anthropic)
 - [ ] Automatic metadata fetching and tagging
 - [ ] Integration with media servers (Plex, Jellyfin)

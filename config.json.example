@@ -1,0 +1,13 @@
+{
+  "DOWNLOADING_PATH": "./test_folders/downloading",
+  "COMPLETED_PATH": "./test_folders/completed",
+  "LIBRARY_PATH": "./test_folders/library",
+  "INSTRUCTIONS_FILE_PATH": "./instructions.md",
+  "AI_PROVIDER": "google",
+  "AI_MODEL": "gemini-2.0-flash-exp",
+  "OLLAMA_BASE_URL": "http://localhost:11434",
+  "OLLAMA_MODEL": "llama2",
+  "DRY_RUN_MODE": false,
+  "ENABLE_WEB_SEARCH": true,
+  "AI_CALL_DELAY_SECONDS": 2
+}
