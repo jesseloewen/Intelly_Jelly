@@ -209,6 +209,157 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* Mobile Portrait Optimizations */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                max-width: 100%;
+            }
+            
+            header {
+                padding: 15px;
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            h1 {
+                font-size: 22px;
+            }
+            
+            .nav-links {
+                width: 100%;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            
+            .nav-links a {
+                padding: 8px 16px;
+                font-size: 14px;
+            }
+            
+            .settings-container {
+                padding: 15px;
+            }
+            
+            .settings-header h2 {
+                font-size: 20px;
+            }
+            
+            .settings-header p {
+                font-size: 13px;
+            }
+            
+            .settings-section {
+                margin-bottom: 20px;
+                padding-bottom: 20px;
+            }
+            
+            .settings-section h3 {
+                font-size: 16px;
+                margin-bottom: 15px;
+            }
+            
+            .form-group {
+                margin-bottom: 15px;
+            }
+            
+            .form-group label {
+                font-size: 13px;
+            }
+            
+            .form-group input,
+            .form-group select {
+                padding: 10px;
+                font-size: 14px;
+            }
+            
+            .form-group small {
+                font-size: 11px;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            .save-btn {
+                width: 100%;
+                padding: 14px;
+                font-size: 15px;
+            }
+            
+            .alert {
+                padding: 10px 15px;
+                font-size: 13px;
+            }
+        }
+        
+        /* Tablet and Small Desktop Optimizations */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .container {
+                max-width: 100%;
+            }
+            
+            header {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+            
+            .settings-container {
+                padding: 25px;
+            }
+            
+            .form-row {
+                gap: 15px;
+            }
+        }
+        
+        /* Large Desktop Optimizations */
+        @media (min-width: 1200px) {
+            .container {
+                max-width: 1200px;
+            }
+            
+            .settings-container {
+                padding: 40px;
+            }
+            
+            .form-row {
+                gap: 30px;
+            }
+        }
+        
+        /* Landscape Mobile Optimizations */
+        @media (max-width: 768px) and (orientation: landscape) {
+            body {
+                padding: 10px;
+            }
+            
+            header {
+                flex-direction: row;
+                padding: 10px 15px;
+            }
+            
+            h1 {
+                font-size: 20px;
+            }
+            
+            .settings-container {
+                padding: 15px;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
     </style>
 </head>
 <body>
