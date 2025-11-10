@@ -146,8 +146,6 @@ def update_config():
         'COMPLETED_PATH',
         'LIBRARY_PATH',
         'INSTRUCTIONS_FILE_PATH',
-        'DEBOUNCE_SECONDS',
-        'AI_BATCH_SIZE',
         'AI_PROVIDER',
         'AI_MODEL',
         'DRY_RUN_MODE',

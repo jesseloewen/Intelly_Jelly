@@ -12,8 +12,7 @@ from backend.ai_processor import AIProcessor
 from backend.file_watcher import (
     FileWatcher, 
     DownloadingFolderHandler, 
-    CompletedFolderHandler,
-    DebouncedProcessor
+    CompletedFolderHandler
 )
 
 logger = logging.getLogger(__name__)
@@ -27,10 +26,9 @@ class BackendOrchestrator:
         
         self.downloading_watcher: Optional[FileWatcher] = None
         self.completed_watcher: Optional[FileWatcher] = None
-        self.debounced_processor: Optional[DebouncedProcessor] = None
         
-        self.priority_thread: Optional[threading.Thread] = None
-        self.priority_running = False
+        self.queue_thread: Optional[threading.Thread] = None
+        self.queue_running = False
         
         self._running = False
         
@@ -46,11 +44,9 @@ class BackendOrchestrator:
         
         downloading_path = self.config_manager.get('DOWNLOADING_PATH')
         completed_path = self.config_manager.get('COMPLETED_PATH')
-        debounce_seconds = self.config_manager.get('DEBOUNCE_SECONDS', 5)
         
         logger.info(f"Monitoring downloading folder: {downloading_path}")
         logger.info(f"Monitoring completed folder: {completed_path}")
-        logger.info(f"Debounce time: {debounce_seconds} seconds")
         
         downloading_handler = DownloadingFolderHandler(self._on_file_detected, downloading_path)
         self.downloading_watcher = FileWatcher(downloading_path, downloading_handler)
@@ -62,16 +58,10 @@ class BackendOrchestrator:
         self.completed_watcher.start()
         logger.debug("Completed folder watcher started")
         
-        self.debounced_processor = DebouncedProcessor(
-            debounce_seconds,
-            self._process_ai_batch
-        )
-        logger.debug("Debounced processor initialized")
-        
-        self.priority_running = True
-        self.priority_thread = threading.Thread(target=self._priority_queue_worker, daemon=True)
-        self.priority_thread.start()
-        logger.debug("Priority queue worker thread started")
+        self.queue_running = True
+        self.queue_thread = threading.Thread(target=self._queue_worker, daemon=True)
+        self.queue_thread.start()
+        logger.debug("Queue worker thread started")
         
         logger.info("Backend orchestrator started successfully")
 
@@ -83,7 +73,7 @@ class BackendOrchestrator:
         logger.info("Stopping backend orchestrator...")
         
         self._running = False
-        self.priority_running = False
+        self.queue_running = False
         
         if self.downloading_watcher:
             self.downloading_watcher.stop()
@@ -93,13 +83,9 @@ class BackendOrchestrator:
             self.completed_watcher.stop()
             logger.debug("Completed folder watcher stopped")
         
-        if self.debounced_processor:
-            self.debounced_processor.stop()
-            logger.debug("Debounced processor stopped")
-        
-        if self.priority_thread:
-            self.priority_thread.join(timeout=5)
-            logger.debug("Priority queue worker thread stopped")
+        if self.queue_thread:
+            self.queue_thread.join(timeout=5)
+            logger.debug("Queue worker thread stopped")
         
         logger.info("Backend orchestrator stopped successfully")
 
@@ -113,153 +99,89 @@ class BackendOrchestrator:
             return
         
         job = self.job_store.add_job(file_path, relative_path)
-        logger.info(f"Created job {job.job_id} for {relative_path}")
-        
-        self.debounced_processor.trigger()
-        logger.debug("Triggered debounced processor")
+        logger.info(f"Created job {job.job_id} for {relative_path} - added to queue")
+        # Job is now in queue and will be processed by queue worker
 
-    def _process_ai_batch(self):
-        logger.info("Processing AI batch...")
+    def _queue_worker(self):
+        """Process jobs one at a time from the queue."""
+        logger.info("Queue worker started - processing one job at a time")
         
-        queued_jobs = self.job_store.get_jobs_by_status(JobStatus.QUEUED_FOR_AI)
-        
-        non_priority_jobs = [job for job in queued_jobs if not job.priority]
-        
-        if not non_priority_jobs:
-            logger.debug("No jobs to process in batch")
-            return
-        
-        batch_size = self.config_manager.get('AI_BATCH_SIZE', 10)
-        logger.info(f"Found {len(non_priority_jobs)} jobs to process with batch size {batch_size}")
-        
-        for i in range(0, len(non_priority_jobs), batch_size):
-            batch = non_priority_jobs[i:i + batch_size]
-            logger.debug(f"Processing batch {i//batch_size + 1} with {len(batch)} jobs")
-            self._process_batch(batch)
-
-    def _process_batch(self, jobs: List):
-        if not jobs:
-            logger.debug("Empty batch provided, skipping")
-            return
-        
-        logger.info(f"Processing batch of {len(jobs)} jobs")
-        logger.debug(f"Job IDs in batch: {[job.job_id for job in jobs]}")
-        
-        for job in jobs:
-            self.job_store.update_job(job.job_id, JobStatus.PROCESSING_AI)
-            logger.debug(f"Updated job {job.job_id} to PROCESSING_AI status")
-        
-        file_paths = [job.relative_path for job in jobs]
-        
-        # Get web search setting from config
-        enable_web_search = self.config_manager.get('ENABLE_WEB_SEARCH', False)
-        logger.debug(f"Batch processing with web search: {enable_web_search}")
-        
-        try:
-            logger.info(f"Sending {len(file_paths)} files to AI processor with web search={enable_web_search}")
-            results = self.ai_processor.process_batch(file_paths, enable_web_search=enable_web_search)
-            logger.info(f"Received {len(results)} results from AI processor")
-            
-            for job in jobs:
-                matching_result = None
-                for result in results:
-                    if result.get('original_path') == job.relative_path:
-                        matching_result = result
-                        break
-                
-                if matching_result:
-                    suggested_name = matching_result.get('suggested_name')
-                    confidence = matching_result.get('confidence', 0)
-                    self.job_store.update_job(
-                        job.job_id,
-                        JobStatus.PENDING_COMPLETION,
-                        ai_determined_name=suggested_name,
-                        confidence=confidence
-                    )
-                    logger.info(f"Job {job.job_id} completed: {job.relative_path} -> {suggested_name} (confidence: {confidence}%)")
-                else:
-                    logger.warning(f"No AI result returned for job {job.job_id} ({job.relative_path})")
-                    self.job_store.update_job(
-                        job.job_id,
-                        JobStatus.FAILED,
-                        error_message="No AI result returned"
-                    )
-        
-        except Exception as e:
-            logger.error(f"Error processing batch: {type(e).__name__}: {e}", exc_info=True)
-            for job in jobs:
-                logger.error(f"Marking job {job.job_id} as FAILED due to batch error")
-                self.job_store.update_job(
-                    job.job_id,
-                    JobStatus.FAILED,
-                    error_message=str(e)
-                )
-
-    def _priority_queue_worker(self):
-        logger.info("Priority queue worker started")
-        
-        while self.priority_running:
+        while self.queue_running:
             try:
+                # First check for priority jobs (re-AI requests)
                 priority_jobs = self.job_store.get_priority_jobs()
                 
                 if priority_jobs:
                     job = priority_jobs[0]
                     logger.info(f"Processing priority job: {job.job_id} ({job.relative_path})")
+                    self._process_single_job(job, is_priority=True)
+                else:
+                    # Process regular queued jobs one at a time
+                    queued_jobs = self.job_store.get_jobs_by_status(JobStatus.QUEUED_FOR_AI)
+                    non_priority_jobs = [j for j in queued_jobs if not j.priority]
                     
-                    self.job_store.update_job(job.job_id, JobStatus.PROCESSING_AI)
-                    logger.debug(f"Updated priority job {job.job_id} to PROCESSING_AI status")
-                    
-                    try:
-                        custom_prompt = job.custom_prompt
-                        include_instructions = job.include_instructions
-                        include_filename = job.include_filename
-                        enable_web_search = getattr(job, 'enable_web_search', False)
-                        
-                        logger.debug(f"Priority job {job.job_id} settings: custom_prompt={bool(custom_prompt)}, include_instructions={include_instructions}, include_filename={include_filename}, web_search={enable_web_search}")
-                        
-                        results = self.ai_processor.process_batch(
-                            [job.relative_path],
-                            custom_prompt=custom_prompt,
-                            include_default=include_instructions,
-                            include_filename=include_filename,
-                            enable_web_search=enable_web_search
-                        )
-                        
-                        if results and len(results) > 0:
-                            result = results[0]
-                            suggested_name = result.get('suggested_name')
-                            confidence = result.get('confidence', 0)
-                            self.job_store.update_job(
-                                job.job_id,
-                                JobStatus.PENDING_COMPLETION,
-                                ai_determined_name=suggested_name,
-                                confidence=confidence,
-                                priority=False
-                            )
-                            logger.info(f"Priority job {job.job_id} completed: {suggested_name} (confidence: {confidence}%)")
-                        else:
-                            logger.warning(f"No AI result returned for priority job {job.job_id}")
-                            self.job_store.update_job(
-                                job.job_id,
-                                JobStatus.FAILED,
-                                error_message="No AI result returned",
-                                priority=False
-                            )
-                    
-                    except Exception as e:
-                        logger.error(f"Error processing priority job {job.job_id}: {type(e).__name__}: {e}", exc_info=True)
-                        self.job_store.update_job(
-                            job.job_id,
-                            JobStatus.FAILED,
-                            error_message=str(e),
-                            priority=False
-                        )
+                    if non_priority_jobs:
+                        job = non_priority_jobs[0]
+                        logger.info(f"Processing queued job: {job.job_id} ({job.relative_path})")
+                        self._process_single_job(job, is_priority=False)
                 
                 time.sleep(1)
             
             except Exception as e:
-                logger.error(f"Error in priority queue worker: {type(e).__name__}: {e}", exc_info=True)
+                logger.error(f"Error in queue worker: {type(e).__name__}: {e}", exc_info=True)
                 time.sleep(1)
+    
+    def _process_single_job(self, job, is_priority: bool = False):
+        """Process a single job through AI."""
+        self.job_store.update_job(job.job_id, JobStatus.PROCESSING_AI)
+        logger.debug(f"Updated job {job.job_id} to PROCESSING_AI status")
+        
+        try:
+            # Get job settings
+            custom_prompt = getattr(job, 'custom_prompt', None)
+            include_instructions = getattr(job, 'include_instructions', True)
+            include_filename = getattr(job, 'include_filename', True)
+            enable_web_search = getattr(job, 'enable_web_search', self.config_manager.get('ENABLE_WEB_SEARCH', False))
+            
+            logger.debug(f"Job {job.job_id} settings: custom_prompt={bool(custom_prompt)}, include_instructions={include_instructions}, include_filename={include_filename}, web_search={enable_web_search}")
+            
+            # Process single file
+            result = self.ai_processor.process_single(
+                job.relative_path,
+                custom_prompt=custom_prompt,
+                include_default=include_instructions,
+                include_filename=include_filename,
+                enable_web_search=enable_web_search
+            )
+            
+            if result:
+                suggested_name = result.get('suggested_name')
+                confidence = result.get('confidence', 0)
+                self.job_store.update_job(
+                    job.job_id,
+                    JobStatus.PENDING_COMPLETION,
+                    ai_determined_name=suggested_name,
+                    confidence=confidence,
+                    priority=False if is_priority else job.priority
+                )
+                logger.info(f"Job {job.job_id} completed: {job.relative_path} -> {suggested_name} (confidence: {confidence}%)")
+            else:
+                logger.warning(f"No AI result returned for job {job.job_id}")
+                self.job_store.update_job(
+                    job.job_id,
+                    JobStatus.FAILED,
+                    error_message="No AI result returned",
+                    priority=False if is_priority else job.priority
+                )
+        
+        except Exception as e:
+            logger.error(f"Error processing job {job.job_id}: {type(e).__name__}: {e}", exc_info=True)
+            self.job_store.update_job(
+                job.job_id,
+                JobStatus.FAILED,
+                error_message=str(e),
+                priority=False if is_priority else job.priority
+            )
 
     def _on_file_completed(self, file_path: str, relative_path: str):
         logger.info(f"File appeared in completed folder: {relative_path}")
@@ -389,13 +311,6 @@ class BackendOrchestrator:
                 self.completed_watcher.handler.update_base_path(new_completed_path)
                 self.completed_watcher.restart(new_completed_path)
                 logger.debug("Completed watcher restarted with new path")
-        
-        if old_config.get('DEBOUNCE_SECONDS') != new_config.get('DEBOUNCE_SECONDS'):
-            new_debounce = new_config.get('DEBOUNCE_SECONDS', 5)
-            logger.info(f"Debounce time changed: {old_config.get('DEBOUNCE_SECONDS')} -> {new_debounce}")
-            if self.debounced_processor:
-                self.debounced_processor.update_debounce_time(new_debounce)
-                logger.debug("Debounced processor updated with new time")
 
     def manual_edit_job(self, job_id: str, new_name: str, new_path: Optional[str] = None):
         logger.info(f"Manual edit requested for job {job_id}")

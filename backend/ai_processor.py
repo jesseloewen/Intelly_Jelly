@@ -42,9 +42,18 @@ class AIProcessor:
         
         return prompt
 
+    def process_single(self, file_path: str, custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False) -> Optional[Dict]:
+        """Process a single file using Google AI with optional web search."""
+        logger.info(f"Starting AI processing for file: {file_path}")
+        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}")
+        
+        # Process as single-item batch and return first result
+        results = self.process_batch([file_path], custom_prompt, include_default, include_filename, enable_web_search)
+        return results[0] if results else None
+    
     def process_batch(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False) -> List[Dict]:
-        """Process a batch of files using Google AI with optional web search."""
-        logger.info(f"Starting AI batch processing for {len(file_paths)} files")
+        """Process files using Google AI with optional web search."""
+        logger.info(f"Starting AI processing for {len(file_paths)} file(s)")
         logger.debug(f"Files to process: {file_paths}")
         logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}")
         

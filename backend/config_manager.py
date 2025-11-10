@@ -56,12 +56,10 @@ class ConfigManager:
             "COMPLETED_PATH": "./test_folders/completed",
             "LIBRARY_PATH": "./test_folders/library",
             "INSTRUCTIONS_FILE_PATH": "./instructions.md",
-            "DEBOUNCE_SECONDS": 5,
-            "AI_BATCH_SIZE": 10,
             "AI_PROVIDER": "google",
-            "AI_MODEL": "gemini-pro",
+            "AI_MODEL": "gemini-2.0-flash-exp",
             "DRY_RUN_MODE": False,
-            "ENABLE_WEB_SEARCH": False
+            "ENABLE_WEB_SEARCH": True
         }
 
     def _start_watching(self):
