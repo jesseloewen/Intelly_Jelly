@@ -118,7 +118,10 @@ def get_models():
         models = ai_processor.get_available_models(provider)
         return jsonify({'models': models})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        if provider == 'openai':
+            models = ai_processor._openai_chat_model_candidates()
+            return jsonify({'models': models, 'warning': str(e)}), 200
+        return jsonify({'models': [], 'warning': str(e)}), 200
 
 
 @app.route('/api/stats', methods=['GET'])

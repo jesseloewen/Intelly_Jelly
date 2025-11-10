@@ -176,18 +176,42 @@ class AIProcessor:
                 return []
         except Exception as e:
             print(f"Error fetching models for {provider}: {e}")
+            if provider == 'openai':
+                return self._openai_chat_model_candidates()
             return []
+
+    def _openai_chat_model_candidates(self) -> List[str]:
+        return [
+            "gpt-4o",
+            "gpt-4o-mini",
+            "gpt-4-turbo",
+            "gpt-4",
+            "gpt-3.5-turbo",
+        ]
 
     def _get_openai_models(self) -> List[str]:
         api_key = self.config_manager.get_env('OPENAI_API_KEY')
         if not api_key:
-            return []
+            return self._openai_chat_model_candidates()
         
-        client = OpenAI(api_key=api_key)
-        models = client.models.list()
+        org = self.config_manager.get_env('OPENAI_ORG') or self.config_manager.get_env('OPENAI_ORGANIZATION')
         
-        chat_models = [m.id for m in models.data if 'gpt' in m.id.lower()]
-        return sorted(chat_models)
+        try:
+            if org:
+                client = OpenAI(api_key=api_key, organization=org)
+            else:
+                client = OpenAI(api_key=api_key)
+            
+            models = client.models.list()
+            ids = [m.id for m in models.data]
+            
+            allowed_prefixes = ("gpt-3.5-turbo", "gpt-4", "gpt-4o", "gpt-4-turbo")
+            candidates = sorted({mid for mid in ids if mid.startswith(allowed_prefixes)})
+            
+            return candidates if candidates else self._openai_chat_model_candidates()
+        except Exception as e:
+            print(f"OpenAI models.list error: {e}")
+            return self._openai_chat_model_candidates()
 
     def _get_google_models(self) -> List[str]:
         api_key = self.config_manager.get_env('GOOGLE_API_KEY')
