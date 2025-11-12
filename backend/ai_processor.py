@@ -76,7 +76,7 @@ class AIProcessor:
                     "parts": [{"text": prompt}]
                 }],
                 "generationConfig": {
-                    "temperature": 0.7,
+                    "temperature": 0.1,
                     "topK": 1,
                     "topP": 1,
                     "maxOutputTokens": 2048,
@@ -93,7 +93,7 @@ class AIProcessor:
                     "parts": [{"text": prompt}]
                 }],
                 "generationConfig": {
-                    "temperature": 0.7,
+                    "temperature": 0.1,
                     "topK": 1,
                     "topP": 1,
                     "maxOutputTokens": 2048,

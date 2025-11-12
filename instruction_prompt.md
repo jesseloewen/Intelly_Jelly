@@ -15,7 +15,7 @@ You must return **only a single JSON array** as your response. Each object in th
 3.  **Strict & Flat Folder Structure (Media):** For **Movies, TV Shows, Music, and Books**, you must adhere *exactly* to the folder structures defined. These structures represent the **maximum allowed directory depth**. Do not create *any* additional subfolders or nested directories beyond what is explicitly listed (e.g., `Season XX`, `extras`, `Album`, etc.). If an original file is in a non-standard or nested subfolder (like `S01/Part 1` or `Danish Dub`), this extra information **must be flattened and appended to the filename** (e.g., `Movie Title (Year) - Part 1.mkv` or `TV Show (Year) - S01E01 - Danish Dub.mkv`). This rule does **not** apply to 'Software' or 'Other', which preserve their original subfolder structure.
 4.  **Filter Non-Media Files:** If a file is part of a download (e.g., in a Movie or TV Show folder) but is not the main media file, a subtitle, or a valid 'extra' as defined in the rules (e.g., it's an "extra picture" `.jpg`, `.png`, `.nfo`, or `.txt` file), it **must be categorized as `Other`**. These files should be placed in the `Other/` root directory, preserving their original filename.
 5.  **Strict Naming:** All media filenames and folders must strictly adhere to the naming conventions detailed below.
-6.  **Valid Characters:** All suggested paths and filenames must be sanitized. Remove or replace any characters that are invalid in file systems (e.g., `?`, `*`, `<`, `>`, `|`, `"`, `-`). Colons (`:`) are a common invalid character in titles and **must** be replaced with a space or simply removed. Hyphens (`-`) in titles **must** be replaced with a space.
+6.  **Valid Characters:** All suggested paths and filenames must be sanitized. Remove or replace any characters that are invalid in file systems (e.g., `?`, `*`, `<`, `>`, `|`, `"`). Colons (`:`) are a common invalid character in titles and **must** be replaced with a space or " - ". 
 
 -----
 
@@ -61,11 +61,13 @@ You must return **only a single JSON array** as your response. Each object in th
 
 #### 📺 TV Shows
 
-  * **Folder Structure:** `TV Shows/Series Name (Year)/Season XX/` (e.g., `Season 01`, `Season 02`)
-  * **File Naming:** The format is `Series Name (Year) - SXXEYY - Episode Name.ext`.
+  * **Folder Structure:** `TV Shows/Series Name (Country Tag) (Year)/Season XX/` (e.g., `Season 01`, `Season 02`)
+  * **Country Tags:** If a TV show has multiple versions from different countries (e.g., The Office, Ghosts, Shameless), you **must** include the country tag in parentheses before the year. Examples: `The Office (US) (2005)`, `Ghosts (UK) (2019)`, `Shameless (US) (2011)`. If there is only one version of the show, no country tag is needed.
+  * **File Naming:** The format is `Series Name (Country Tag) (Year) - SXXEYY - Episode Name.ext`.
       * You **must** search for and include the episode name.
-      * If an episode name **cannot be found** after searching, use the fallback format `Series Name (Year) - SXXEYY.ext` and **lower the confidence score**.
-      * For multi-part episodes: `Series Name (Year) - SXXEYY - EZZ - Episode Name.ext`.
+      * If an episode name **cannot be found** after searching, use the fallback format `Series Name (Country Tag) (Year) - SXXEYY.ext` and **lower the confidence score**.
+      * For multi-part episodes: `Series Name (Country Tag) (Year) - SXXEYY - EZZ - Episode Name.ext`.
+      * The country tag is **optional** and only required when multiple versions of the show exist from different countries.
   * **Extras:** Place in subfolders at the **Series level** or **Season level**.
       * **Valid Subfolders:** `behind the scenes`, `deleted scenes`, `interviews`, `scenes`, `samples`, `shorts`, `featurettes`, `clips`, `other`, `extras`, `trailers`.
       * **File Naming:** Use descriptive names (e.g., `Season 01/interviews/Interview with Cast.mp4`).
@@ -74,6 +76,16 @@ You must return **only a single JSON array** as your response. Each object in th
 
 ```json
 [
+  {
+    "original_path": "torrents/the.office.s01e02.hdtv.mkv",
+    "suggested_name": "TV Shows/The Office (US) (2005)/Season 01/The Office (US) (2005) - S01E02 - Diversity Day.mkv",
+    "confidence": 100
+  },
+  {
+    "original_path": "torrents/ghosts.uk.s01e01.mkv",
+    "suggested_name": "TV Shows/Ghosts (UK) (2019)/Season 01/Ghosts (UK) (2019) - S01E01 - Who Do You Think You Are.mkv",
+    "confidence": 100
+  },
   {
     "original_path": "torrents/series.name.a.s01e02.hdtv.mkv",
     "suggested_name": "TV Shows/Series Name A (2010)/Season 01/Series Name A (2010) - S01E02 - The Episode Title.mkv",
