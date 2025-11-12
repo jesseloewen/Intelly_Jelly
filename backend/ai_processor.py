@@ -13,7 +13,7 @@ class AIProcessor:
         self.last_api_call_time = 0
 
     def _get_instructions(self) -> str:
-        instructions_path = self.config_manager.get('INSTRUCTIONS_FILE_PATH', './instructions.txt')
+        instructions_path = './instruction_prompt.md'
         try:
             with open(instructions_path, 'r', encoding='utf-8') as f:
                 content = f.read()

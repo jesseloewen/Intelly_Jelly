@@ -401,12 +401,6 @@
                         <input type="text" id="library-path" name="LIBRARY_PATH" placeholder="./test_folders/library">
                         <small>Path where organized files will be stored</small>
                     </div>
-                    
-                    <div class="form-group">
-                        <label for="instructions-path">Instructions File Path</label>
-                        <input type="text" id="instructions-path" name="INSTRUCTIONS_FILE_PATH" placeholder="./instructions.txt">
-                        <small>Path to the AI prompt instructions file</small>
-                    </div>
                 </div>
                 
                 <div class="settings-section">
@@ -476,7 +470,6 @@
                 document.getElementById('downloading-path').value = currentConfig.DOWNLOADING_PATH || '';
                 document.getElementById('completed-path').value = currentConfig.COMPLETED_PATH || '';
                 document.getElementById('library-path').value = currentConfig.LIBRARY_PATH || '';
-                document.getElementById('instructions-path').value = currentConfig.INSTRUCTIONS_FILE_PATH || '';
                 document.getElementById('ai-delay').value = currentConfig.AI_CALL_DELAY_SECONDS || 2;
                 document.getElementById('dry-run').checked = currentConfig.DRY_RUN_MODE || false;
                 document.getElementById('web-search').checked = currentConfig.ENABLE_WEB_SEARCH || false;

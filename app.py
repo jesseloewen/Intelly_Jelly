@@ -145,8 +145,6 @@ def update_config():
         'DOWNLOADING_PATH',
         'COMPLETED_PATH',
         'LIBRARY_PATH',
-        'INSTRUCTIONS_FILE_PATH',
-        'AI_PROVIDER',
         'AI_MODEL',
         'DRY_RUN_MODE',
         'ENABLE_WEB_SEARCH',

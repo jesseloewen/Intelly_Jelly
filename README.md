@@ -19,6 +19,7 @@ Intelly Jelly is a multi-threaded Python application that watches your download 
 - **🎯 Flexible Rules**: Customizable organization rules for Movies, TV Shows, Music, Books, and more
 - **🏃 Dry Run Mode**: Test organization without actually moving files
 - **📝 Comprehensive Logging**: Detailed logging of all operations and API interactions
+- **🍇 Jellyfin Integration**: Optional automatic library refresh when files are organized
 
 ---
 
@@ -27,7 +28,8 @@ Intelly Jelly is a multi-threaded Python application that watches your download 
 ### Prerequisites
 
 - Python 3.8 or higher
-- Google AI API Key ([Get one here](https://makersuite.google.com/app/apikey))
+- Google Gemini API Key ([Get one here](https://makersuite.google.com/app/apikey))
+- (Optional) Jellyfin server for library refresh integration
 
 ### Installation
 
@@ -44,9 +46,18 @@ Intelly Jelly is a multi-threaded Python application that watches your download 
 
 3. **Set up your environment**
    
-   Create a `.env` file in the root directory:
+   Copy `.env.example` to `.env` and add your API keys:
+   ```bash
+   cp .env.example .env
+   ```
+   
+   Edit `.env` with your keys:
    ```env
-   GOOGLE_API_KEY=your_api_key_here
+   # Google AI API Key
+   GOOGLE_API_KEY=your_google_api_key_here
+   
+   # Jellyfin Configuration (optional)
+   JELLYFIN_API_KEY=your_jellyfin_api_key_here
    ```
 
 4. **Configure your paths**
@@ -57,7 +68,9 @@ Intelly Jelly is a multi-threaded Python application that watches your download 
      "DOWNLOADING_PATH": "./test_folders/downloading",
      "COMPLETED_PATH": "./test_folders/completed",
      "LIBRARY_PATH": "./test_folders/library",
-     "ENABLE_WEB_SEARCH": true
+     "AI_MODEL": "gemini-2.0-flash-exp",
+     "ENABLE_WEB_SEARCH": true,
+     "JELLYFIN_REFRESH_ENABLED": false
    }
    ```
 
@@ -121,9 +134,9 @@ library/
 Configure all aspects of the application:
 
 - **Folder Paths**: Set downloading, completed, and library directories
-- **AI Settings**: Choose model, enable web search, adjust batch size
-- **Processing**: Configure debounce timing and dry run mode
-- **Instructions**: Customize the AI organization rules
+- **AI Settings**: Select Google Gemini model, enable web search, adjust processing delay
+- **Processing**: Configure dry run mode for testing
+- **Jellyfin Integration**: Enable automatic library refresh after file organization
 
 ---
 
@@ -136,18 +149,22 @@ Configure all aspects of the application:
 | `DOWNLOADING_PATH` | Folder to watch for new files | `./test_folders/downloading` |
 | `COMPLETED_PATH` | Folder where downloaded files appear | `./test_folders/completed` |
 | `LIBRARY_PATH` | Destination for organized files | `./test_folders/library` |
-| `INSTRUCTIONS_FILE_PATH` | Path to AI instruction file | `./instructions.md` |
-| `DEBOUNCE_SECONDS` | Wait time before batch processing | `5` |
-| `AI_BATCH_SIZE` | Number of files to process at once | `10` |
-| `AI_MODEL` | Google AI model to use | `gemini-2.0-flash-exp` |
+| `AI_MODEL` | Google Gemini model to use | `gemini-2.0-flash-exp` |
+| `AI_CALL_DELAY_SECONDS` | Delay between AI API calls | `2` |
 | `DRY_RUN_MODE` | Test without moving files | `false` |
 | `ENABLE_WEB_SEARCH` | Enable Google Search grounding | `true` |
+| `JELLYFIN_REFRESH_ENABLED` | Auto-refresh Jellyfin library | `false` |
 
-### Environment Variables
+**Note**: AI instructions are stored in `instruction_prompt.md` (not configurable).
+
+### Environment Variables (`.env`)
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `GOOGLE_API_KEY` | Your Google AI API key | Yes |
+| `GOOGLE_API_KEY` | Your Google Gemini API key | Yes |
+| `JELLYFIN_API_KEY` | Your Jellyfin API key | If using Jellyfin integration |
+
+**Note**: Jellyfin server address is hardcoded to `http://localhost:8096`.
 
 ---
 
@@ -180,7 +197,7 @@ Books/Author Name/Book Title (Year)/Book Title.ext
 Games/Platform/Game Title (Year)/Game Title.ext
 ```
 
-For complete details, see [`instructions.md`](instructions.md) or the [File Organization Rules](Project_Wiki/06_File_Organization_Rules.md) documentation.
+For complete details, see [`instruction_prompt.md`](instruction_prompt.md) or the [File Organization Rules](Project_Wiki/06_File_Organization_Rules.md) documentation.
 
 ---
 
@@ -333,9 +350,10 @@ This project is provided as-is for personal use. See repository for license deta
 
 ## 🗺️ Roadmap
 
-- [ ] Support for additional AI providers (OpenAI, Anthropic)
+- [x] Integration with Jellyfin media server
+- [ ] Support for additional AI providers (OpenAI, Anthropic Claude)
+- [ ] Integration with Plex media server
 - [ ] Automatic metadata fetching and tagging
-- [ ] Integration with media servers (Plex, Jellyfin)
 - [ ] Mobile app for remote monitoring
 - [ ] Advanced filtering and search
 - [ ] Scheduled processing windows
