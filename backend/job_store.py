@@ -34,6 +34,7 @@ class Job:
         self.retry_count: int = 0
         self.max_retries: int = 3
         self._missing_since: Optional[float] = None
+        self.completed_file_path: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {

@@ -179,6 +179,11 @@ class BackendOrchestrator:
                     priority=False if is_priority else job.priority
                 )
                 logger.info(f"Job {job.job_id} completed: {job.relative_path} -> {suggested_name} (confidence: {confidence}%)")
+                
+                # If file is already waiting in completed folder, organize it now
+                if job.completed_file_path and os.path.exists(job.completed_file_path):
+                    logger.info(f"Job {job.job_id} file already in completed folder, organizing now")
+                    self._organize_file(job, job.completed_file_path)
             else:
                 logger.warning(f"No AI result returned for job {job.job_id}")
                 # Increment retry count if this is a retry attempt
@@ -241,13 +246,24 @@ class BackendOrchestrator:
         
         logger.info(f"Found matching job {job.job_id} for {relative_path}")
         
-        if job.status != JobStatus.PENDING_COMPLETION and job.status != JobStatus.MANUAL_EDIT:
-            logger.warning(f"Job {job.job_id} is not ready for completion (status: {job.status.value})")
-            return
+        # Store the completed file path for later organization
+        job.completed_file_path = file_path
         
-        self._organize_file(job, file_path)
+        # If AI processing is done (PENDING_COMPLETION or MANUAL_EDIT), organize immediately
+        if job.status == JobStatus.PENDING_COMPLETION or job.status == JobStatus.MANUAL_EDIT:
+            logger.info(f"Job {job.job_id} AI processing complete, organizing now")
+            self._organize_file(job, file_path)
+        else:
+            # File arrived early, hold it in completed folder until AI processing is done
+            logger.info(f"Job {job.job_id} file arrived early (status: {job.status.value}), holding in completed folder until AI processing completes")
+            # The queue worker will check for this and organize when ready
 
     def _organize_file(self, job, file_path: str):
+        # Safety check: don't organize if already completed
+        if job.status == JobStatus.COMPLETED:
+            logger.warning(f"Job {job.job_id} already completed, skipping organization")
+            return
+        
         library_path = self.config_manager.get('LIBRARY_PATH')
         dry_run = self.config_manager.get('DRY_RUN_MODE', False)
         
@@ -303,6 +319,10 @@ class BackendOrchestrator:
             # Clean up empty directories in downloading folder
             downloading_path = self.config_manager.get('DOWNLOADING_PATH')
             self._cleanup_empty_directories(downloading_path)
+            
+            # Clean up empty directories in completed folder (including subdirectories)
+            completed_path = self.config_manager.get('COMPLETED_PATH')
+            self._cleanup_empty_directories(completed_path)
             
             # Auto-remove completed job from store after 1 second
             # This gives the UI time to display completion status before removal
@@ -391,8 +411,9 @@ class BackendOrchestrator:
         return True
 
     def _check_and_remove_missing_files(self):
-        """Check if files in downloading folder still exist, remove jobs for missing files after 5 seconds."""
+        """Check if files exist in downloading or completed folders, remove jobs for missing files after 5 seconds."""
         downloading_path = self.config_manager.get('DOWNLOADING_PATH')
+        completed_path = self.config_manager.get('COMPLETED_PATH')
         
         # Get all jobs that are not yet completed
         active_jobs = [
@@ -401,13 +422,23 @@ class BackendOrchestrator:
         ]
         
         for job in active_jobs:
-            # Construct the full path to check
-            file_path = os.path.join(downloading_path, job.relative_path)
+            # Check if file exists in either downloading or completed folder
+            downloading_file_path = os.path.join(downloading_path, job.relative_path)
             
-            # Check if file exists
-            if not os.path.exists(file_path):
+            # Also check if there's a known completed file path
+            file_exists = os.path.exists(downloading_file_path)
+            
+            if not file_exists and job.completed_file_path:
+                file_exists = os.path.exists(job.completed_file_path)
+            
+            if not file_exists:
+                # Also try completed folder with relative path
+                completed_file_path = os.path.join(completed_path, job.relative_path)
+                file_exists = os.path.exists(completed_file_path)
+            
+            if not file_exists:
                 # Check if we've already noted this file as missing
-                if not hasattr(job, '_missing_since'):
+                if job._missing_since is None:
                     # First time noticing it's missing, record the time
                     job._missing_since = time.time()
                     logger.debug(f"File missing for job {job.job_id}: {job.relative_path}")
@@ -417,11 +448,10 @@ class BackendOrchestrator:
                     self.job_store.delete_job(job.job_id)
             else:
                 # File exists, clear any missing flag
-                if hasattr(job, '_missing_since'):
-                    delattr(job, '_missing_since')
+                job._missing_since = None
 
     def _cleanup_empty_directories(self, base_path: str):
-        """Remove empty directories from the downloading folder."""
+        """Remove empty directories (including subdirectories) from the specified folder."""
         try:
             # Walk the directory tree bottom-up so we can remove empty subdirectories first
             for root, dirs, files in os.walk(base_path, topdown=False):
