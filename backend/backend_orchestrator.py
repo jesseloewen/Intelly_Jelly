@@ -111,6 +111,9 @@ class BackendOrchestrator:
         
         while self.queue_running:
             try:
+                # Check for missing files in downloading folder and remove stale jobs
+                self._check_and_remove_missing_files()
+                
                 # First check for priority jobs (re-AI requests)
                 priority_jobs = self.job_store.get_priority_jobs()
                 
@@ -297,6 +300,10 @@ class BackendOrchestrator:
             # Trigger Jellyfin refresh if enabled
             self._trigger_jellyfin_refresh()
             
+            # Clean up empty directories in downloading folder
+            downloading_path = self.config_manager.get('DOWNLOADING_PATH')
+            self._cleanup_empty_directories(downloading_path)
+            
             # Auto-remove completed job from store after 1 second
             # This gives the UI time to display completion status before removal
             def remove_completed_job():
@@ -382,6 +389,54 @@ class BackendOrchestrator:
         logger.info(f"Job {job_id} marked as QUEUED_FOR_AI with priority=True")
         
         return True
+
+    def _check_and_remove_missing_files(self):
+        """Check if files in downloading folder still exist, remove jobs for missing files after 5 seconds."""
+        downloading_path = self.config_manager.get('DOWNLOADING_PATH')
+        
+        # Get all jobs that are not yet completed
+        active_jobs = [
+            job for job in self.job_store.get_all_jobs()
+            if job.status not in [JobStatus.COMPLETED, JobStatus.FAILED]
+        ]
+        
+        for job in active_jobs:
+            # Construct the full path to check
+            file_path = os.path.join(downloading_path, job.relative_path)
+            
+            # Check if file exists
+            if not os.path.exists(file_path):
+                # Check if we've already noted this file as missing
+                if not hasattr(job, '_missing_since'):
+                    # First time noticing it's missing, record the time
+                    job._missing_since = time.time()
+                    logger.debug(f"File missing for job {job.job_id}: {job.relative_path}")
+                elif time.time() - job._missing_since >= 5:
+                    # File has been missing for 5+ seconds, remove the job
+                    logger.info(f"File has been missing for 5+ seconds, removing job {job.job_id}: {job.relative_path}")
+                    self.job_store.delete_job(job.job_id)
+            else:
+                # File exists, clear any missing flag
+                if hasattr(job, '_missing_since'):
+                    delattr(job, '_missing_since')
+
+    def _cleanup_empty_directories(self, base_path: str):
+        """Remove empty directories from the downloading folder."""
+        try:
+            # Walk the directory tree bottom-up so we can remove empty subdirectories first
+            for root, dirs, files in os.walk(base_path, topdown=False):
+                for dir_name in dirs:
+                    dir_path = os.path.join(root, dir_name)
+                    try:
+                        # Try to remove the directory (will only work if empty)
+                        if not os.listdir(dir_path):
+                            os.rmdir(dir_path)
+                            logger.info(f"Removed empty directory: {dir_path}")
+                    except OSError:
+                        # Directory not empty or other error, skip
+                        pass
+        except Exception as e:
+            logger.error(f"Error cleaning up empty directories in {base_path}: {type(e).__name__}: {e}", exc_info=True)
 
     def _trigger_jellyfin_refresh(self):
         """Trigger Jellyfin library refresh if enabled in config."""

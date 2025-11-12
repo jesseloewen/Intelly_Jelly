@@ -33,6 +33,7 @@ class Job:
         self.enable_web_search: bool = False
         self.retry_count: int = 0
         self.max_retries: int = 3
+        self._missing_since: Optional[float] = None
 
     def to_dict(self) -> dict:
         return {
