@@ -387,6 +387,7 @@ def update_config():
         'DOWNLOADING_PATH',
         'COMPLETED_PATH',
         'LIBRARY_PATH',
+        'AI_PROVIDER',
         'AI_MODEL',
         'ENABLE_WEB_SEARCH',
         'AI_CALL_DELAY_SECONDS',
@@ -394,6 +395,7 @@ def update_config():
         'APP_PASSWORD',
         'ADMIN_PASSWORD',
         'GOOGLE_API_KEY',
+        'OPENAI_API_KEY',
         'JELLYFIN_API_KEY'
     ]
     

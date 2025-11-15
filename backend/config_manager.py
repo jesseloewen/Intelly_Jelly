@@ -51,13 +51,15 @@ class ConfigManager:
             "DOWNLOADING_PATH": "./test_folders/downloading",
             "COMPLETED_PATH": "./test_folders/completed",
             "LIBRARY_PATH": "./test_folders/library",
-            "AI_MODEL": "gemini-2.0-flash-exp",
+            "AI_PROVIDER": "google",
+            "AI_MODEL": "gemini-2.5-flash",
             "ENABLE_WEB_SEARCH": True,
             "AI_CALL_DELAY_SECONDS": 2,
             "JELLYFIN_REFRESH_ENABLED": False,
             "APP_PASSWORD": "",
             "ADMIN_PASSWORD": "",
             "GOOGLE_API_KEY": "",
+            "OPENAI_API_KEY": "",
             "JELLYFIN_API_KEY": ""
         }
 

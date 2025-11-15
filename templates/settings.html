@@ -676,12 +676,30 @@
                     <h3>API Keys</h3>
                     
                     <div class="form-group">
+                        <label for="ai-provider">AI Provider</label>
+                        <select id="ai-provider" name="AI_PROVIDER" onchange="handleProviderChange()">
+                            <option value="google">Google AI</option>
+                            <option value="openai">OpenAI</option>
+                        </select>
+                        <small>Select which AI provider to use</small>
+                    </div>
+                    
+                    <div class="form-group" id="google-api-key-group">
                         <label for="google-api-key">Google API Key</label>
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <input type="text" id="google-api-key" name="GOOGLE_API_KEY" placeholder="Enter Google API Key" style="flex: 1;">
                             <button type="button" id="delete-google-key" class="delete-key-btn" style="display: none;" onclick="deleteApiKey('google')">Delete</button>
                         </div>
-                        <small>Required for AI-powered file organization</small>
+                        <small>Required for Google AI-powered file organization</small>
+                    </div>
+                    
+                    <div class="form-group" id="openai-api-key-group" style="display: none;">
+                        <label for="openai-api-key">OpenAI API Key</label>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="text" id="openai-api-key" name="OPENAI_API_KEY" placeholder="Enter OpenAI API Key" style="flex: 1;">
+                            <button type="button" id="delete-openai-key" class="delete-key-btn" style="display: none;" onclick="deleteApiKey('openai')">Delete</button>
+                        </div>
+                        <small>Required for OpenAI-powered file organization</small>
                     </div>
                     
                     <div class="form-group">
@@ -699,11 +717,17 @@
                     <p style="font-size: 14px; margin-bottom: 20px; color: var(--text-secondary);">Jobs are processed one at a time in queue order for optimal reliability.</p>
                     
                     <div class="form-group">
-                        <label for="ai-model">AI Model <span id="model-loading" class="loading" style="display: none;"></span></label>
+                        <label for="ai-model">AI Model</label>
                         <select id="ai-model" name="AI_MODEL">
-                            <option value="">Loading models...</option>
+                            <option value="">Select a model...</option>
                         </select>
-                        <small>Select the Google AI model to use</small>
+                        <small id="ai-model-description">Select the AI model to use</small>
+                    </div>
+                    
+                    <div class="form-group" id="custom-model-group" style="display: none;">
+                        <label for="custom-model">Custom Model Name</label>
+                        <input type="text" id="custom-model" placeholder="Enter custom model name">
+                        <small>Enter the exact model name (e.g., gemini-1.5-pro, gpt-4)</small>
                     </div>
                     
                     <div class="form-group">
@@ -851,9 +875,42 @@
             if (keyType === 'google') {
                 document.getElementById('google-api-key').value = '';
                 document.getElementById('delete-google-key').style.display = 'none';
+            } else if (keyType === 'openai') {
+                document.getElementById('openai-api-key').value = '';
+                document.getElementById('delete-openai-key').style.display = 'none';
             } else if (keyType === 'jellyfin') {
                 document.getElementById('jellyfin-api-key').value = '';
                 document.getElementById('delete-jellyfin-key').style.display = 'none';
+            }
+        }
+        
+        function handleProviderChange() {
+            const provider = document.getElementById('ai-provider').value;
+            const googleKeyGroup = document.getElementById('google-api-key-group');
+            const openaiKeyGroup = document.getElementById('openai-api-key-group');
+            
+            if (provider === 'openai') {
+                googleKeyGroup.style.display = 'none';
+                openaiKeyGroup.style.display = 'block';
+            } else {
+                googleKeyGroup.style.display = 'block';
+                openaiKeyGroup.style.display = 'none';
+            }
+            
+            // Reload models for the selected provider
+            loadModels();
+        }
+        
+        function handleModelChange() {
+            const modelSelect = document.getElementById('ai-model');
+            const customModelGroup = document.getElementById('custom-model-group');
+            const customModelInput = document.getElementById('custom-model');
+            
+            if (modelSelect.value === 'custom') {
+                customModelGroup.style.display = 'block';
+            } else {
+                customModelGroup.style.display = 'none';
+                customModelInput.value = '';
             }
         }
         
@@ -871,14 +928,26 @@
                 document.getElementById('app-password').value = currentConfig.APP_PASSWORD || '';
                 document.getElementById('admin-password').value = currentConfig.ADMIN_PASSWORD || '';
                 
+                // Handle AI provider
+                const provider = currentConfig.AI_PROVIDER || 'google';
+                document.getElementById('ai-provider').value = provider;
+                handleProviderChange();
+                
                 // Handle API keys with masking
                 const googleKey = currentConfig.GOOGLE_API_KEY || '';
+                const openaiKey = currentConfig.OPENAI_API_KEY || '';
                 const jellyfinKey = currentConfig.JELLYFIN_API_KEY || '';
                 
                 if (googleKey) {
                     document.getElementById('google-api-key').value = maskApiKey(googleKey);
                     document.getElementById('google-api-key').dataset.fullKey = googleKey;
                     document.getElementById('delete-google-key').style.display = 'inline-block';
+                }
+                
+                if (openaiKey) {
+                    document.getElementById('openai-api-key').value = maskApiKey(openaiKey);
+                    document.getElementById('openai-api-key').dataset.fullKey = openaiKey;
+                    document.getElementById('delete-openai-key').style.display = 'inline-block';
                 }
                 
                 if (jellyfinKey) {
@@ -896,9 +965,8 @@
         
         async function loadModels() {
             const modelSelect = document.getElementById('ai-model');
-            const loadingIndicator = document.getElementById('model-loading');
+            const provider = document.getElementById('ai-provider').value;
             
-            loadingIndicator.style.display = 'inline-block';
             modelSelect.disabled = true;
             modelSelect.innerHTML = '<option value="">Loading models...</option>';
             
@@ -908,7 +976,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ provider: 'google' })
+                    body: JSON.stringify({ provider: provider })
                 });
                 
                 if (response.ok) {
@@ -923,12 +991,41 @@
                         models.forEach(model => {
                             const option = document.createElement('option');
                             option.value = model;
-                            option.textContent = model;
+                            
+                            // Add recommended tags
+                            if (provider === 'google') {
+                                if (model === 'gemini-2.5-flash') {
+                                    option.textContent = model + ' (recommended)';
+                                } else if (model === 'custom') {
+                                    option.textContent = 'Custom model...';
+                                } else {
+                                    option.textContent = model;
+                                }
+                            } else if (provider === 'openai') {
+                                if (model === 'gpt-5-mini') {
+                                    option.textContent = model + ' (recommended)';
+                                } else if (model === 'custom') {
+                                    option.textContent = 'Custom model...';
+                                } else {
+                                    option.textContent = model;
+                                }
+                            }
+                            
                             modelSelect.appendChild(option);
                         });
                         
+                        // Set current model
                         if (currentConfig.AI_MODEL) {
-                            modelSelect.value = currentConfig.AI_MODEL;
+                            // Check if it's a custom model
+                            const standardModels = models.filter(m => m !== 'custom');
+                            if (standardModels.includes(currentConfig.AI_MODEL)) {
+                                modelSelect.value = currentConfig.AI_MODEL;
+                            } else if (currentConfig.AI_MODEL) {
+                                // It's a custom model
+                                modelSelect.value = 'custom';
+                                document.getElementById('custom-model').value = currentConfig.AI_MODEL;
+                                handleModelChange();
+                            }
                         }
                     }
                 } else {
@@ -938,10 +1035,12 @@
                 console.error('Error loading models:', error);
                 modelSelect.innerHTML = '<option value="">Error loading models</option>';
             } finally {
-                loadingIndicator.style.display = 'none';
                 modelSelect.disabled = false;
             }
         }
+        
+        // Add event listener for model dropdown
+        document.getElementById('ai-model').addEventListener('change', handleModelChange);
         
         document.getElementById('settings-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -965,12 +1064,33 @@
                     config[key] = googleInput.dataset.fullKey && value === maskApiKey(googleInput.dataset.fullKey) 
                         ? googleInput.dataset.fullKey 
                         : value;
+                } else if (key === 'OPENAI_API_KEY') {
+                    // Use full key if it exists (not changed), otherwise use new value
+                    const openaiInput = document.getElementById('openai-api-key');
+                    config[key] = openaiInput.dataset.fullKey && value === maskApiKey(openaiInput.dataset.fullKey) 
+                        ? openaiInput.dataset.fullKey 
+                        : value;
                 } else if (key === 'JELLYFIN_API_KEY') {
                     // Use full key if it exists (not changed), otherwise use new value
                     const jellyfinInput = document.getElementById('jellyfin-api-key');
                     config[key] = jellyfinInput.dataset.fullKey && value === maskApiKey(jellyfinInput.dataset.fullKey) 
                         ? jellyfinInput.dataset.fullKey 
                         : value;
+                } else if (key === 'AI_MODEL') {
+                    // Handle custom model
+                    if (value === 'custom') {
+                        const customModel = document.getElementById('custom-model').value.trim();
+                        if (customModel) {
+                            config[key] = customModel;
+                        } else {
+                            saveBtn.disabled = false;
+                            saveBtn.textContent = 'Save Settings';
+                            showAlert('Please enter a custom model name', 'error');
+                            return;
+                        }
+                    } else {
+                        config[key] = value;
+                    }
                 } else {
                     config[key] = value;
                 }
