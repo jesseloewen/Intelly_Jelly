@@ -379,45 +379,39 @@ h1, h2, h3, h4 {
     color: var(--text-primary);
 }
 
-/* Theme Selector Styles */
-.theme-selector {
+/* Theme Toggle Button Styles */
+.theme-toggle {
+    background: var(--input-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 20px;
+    transition: all 0.3s ease;
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-left: 20px;
+    justify-content: center;
+    margin-left: 15px;
 }
 
-.theme-selector label {
-    color: var(--text-primary);
-    font-size: 14px;
-    font-weight: 600;
-}
-
-.theme-selector select {
-    padding: 8px 12px;
-    border: 1px solid var(--input-border);
-    border-radius: 5px;
-    background: var(--input-bg);
-    color: var(--input-text);
-    cursor: pointer;
-    font-size: 14px;
-    transition: border-color 0.3s;
-}
-
-.theme-selector select:focus {
-    outline: none;
+.theme-toggle:hover {
+    background: var(--table-row-hover);
     border-color: var(--primary-color);
+    transform: scale(1.05);
 }
 
-/* Mobile adjustments for theme selector */
+.theme-toggle:active {
+    transform: scale(0.95);
+}
+
+#theme-icon {
+    display: block;
+    line-height: 1;
+}
+
+/* Mobile adjustments for theme toggle */
 @media (max-width: 768px) {
-    .theme-selector {
+    .theme-toggle {
         margin-left: 0;
-        width: 100%;
-        justify-content: center;
-    }
-    
-    .theme-selector select {
-        flex: 1;
     }
 }

@@ -387,12 +387,9 @@
                     <a href="/settings">Settings</a>
                     <a href="/logs">Logs</a>
                 </div>
-                <div class="theme-selector">
-                    <select id="theme-select" onchange="changeTheme(this.value)">
-                        <option value="dark">🌙 Dark</option>
-                        <option value="light">☀️ Light</option>
-                    </select>
-                </div>
+                <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">
+                    <span id="theme-icon">🌙</span>
+                </button>
             </div>
         </header>
         
@@ -488,12 +485,20 @@
         function initTheme() {
             const savedTheme = localStorage.getItem('intelly-jelly-theme') || 'dark';
             document.documentElement.setAttribute('data-theme', savedTheme);
-            document.getElementById('theme-select').value = savedTheme;
+            updateThemeIcon(savedTheme);
         }
         
-        function changeTheme(theme) {
-            document.documentElement.setAttribute('data-theme', theme);
-            localStorage.setItem('intelly-jelly-theme', theme);
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('intelly-jelly-theme', newTheme);
+            updateThemeIcon(newTheme);
+        }
+        
+        function updateThemeIcon(theme) {
+            const icon = document.getElementById('theme-icon');
+            icon.textContent = theme === 'dark' ? '🌙' : '☀️';
         }
         
         // Initialize theme on page load
