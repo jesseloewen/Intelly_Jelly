@@ -253,6 +253,23 @@
             background: #c0392b;
         }
         
+        .reveal-key-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.3s;
+            white-space: nowrap;
+        }
+        
+        .reveal-key-btn:hover {
+            background: #2980b9;
+        }
+        
         .loading {
             display: inline-block;
             width: 16px;
@@ -735,6 +752,7 @@
                             <label for="google-api-key">Google API Key</label>
                             <div style="display: flex; gap: 10px; align-items: center;">
                                 <input type="text" id="google-api-key" name="GOOGLE_API_KEY" placeholder="Enter Google API Key" style="flex: 1;">
+                                <button type="button" id="reveal-google-key" class="reveal-key-btn" style="display: none;" onclick="toggleRevealKey('google')">👁️</button>
                                 <button type="button" id="delete-google-key" class="delete-key-btn" style="display: none;" onclick="deleteApiKey('google')">Delete</button>
                             </div>
                             <small>Required for Google AI-powered file organization</small>
@@ -744,6 +762,7 @@
                             <label for="openai-api-key">OpenAI API Key</label>
                             <div style="display: flex; gap: 10px; align-items: center;">
                                 <input type="text" id="openai-api-key" name="OPENAI_API_KEY" placeholder="Enter OpenAI API Key" style="flex: 1;">
+                                <button type="button" id="reveal-openai-key" class="reveal-key-btn" style="display: none;" onclick="toggleRevealKey('openai')">👁️</button>
                                 <button type="button" id="delete-openai-key" class="delete-key-btn" style="display: none;" onclick="deleteApiKey('openai')">Delete</button>
                             </div>
                             <small>Required for OpenAI-powered file organization</small>
@@ -798,6 +817,7 @@
                             <label for="jellyfin-api-key">Jellyfin API Key</label>
                             <div style="display: flex; gap: 10px; align-items: center;">
                                 <input type="text" id="jellyfin-api-key" name="JELLYFIN_API_KEY" placeholder="Enter Jellyfin API Key" style="flex: 1;">
+                                <button type="button" id="reveal-jellyfin-key" class="reveal-key-btn" style="display: none;" onclick="toggleRevealKey('jellyfin')">👁️</button>
                                 <button type="button" id="delete-jellyfin-key" class="delete-key-btn" style="display: none;" onclick="deleteApiKey('jellyfin')">Delete</button>
                             </div>
                             <small>Required for automatic Jellyfin library refresh</small>
@@ -956,12 +976,38 @@
             if (keyType === 'google') {
                 document.getElementById('google-api-key').value = '';
                 document.getElementById('delete-google-key').style.display = 'none';
+                document.getElementById('reveal-google-key').style.display = 'none';
+                delete document.getElementById('google-api-key').dataset.fullKey;
             } else if (keyType === 'openai') {
                 document.getElementById('openai-api-key').value = '';
                 document.getElementById('delete-openai-key').style.display = 'none';
+                document.getElementById('reveal-openai-key').style.display = 'none';
+                delete document.getElementById('openai-api-key').dataset.fullKey;
             } else if (keyType === 'jellyfin') {
                 document.getElementById('jellyfin-api-key').value = '';
                 document.getElementById('delete-jellyfin-key').style.display = 'none';
+                document.getElementById('reveal-jellyfin-key').style.display = 'none';
+                delete document.getElementById('jellyfin-api-key').dataset.fullKey;
+            }
+        }
+        
+        function toggleRevealKey(keyType) {
+            const input = document.getElementById(keyType + '-api-key');
+            const revealBtn = document.getElementById('reveal-' + keyType + '-key');
+            const fullKey = input.dataset.fullKey;
+            
+            if (!fullKey) return;
+            
+            if (input.value === maskApiKey(fullKey)) {
+                // Currently masked, reveal it
+                input.value = fullKey;
+                revealBtn.textContent = '🙈';
+                revealBtn.title = 'Hide key';
+            } else {
+                // Currently revealed, mask it
+                input.value = maskApiKey(fullKey);
+                revealBtn.textContent = '👁️';
+                revealBtn.title = 'Show key';
             }
         }
         
@@ -1050,18 +1096,27 @@
                 if (googleKey) {
                     document.getElementById('google-api-key').value = maskApiKey(googleKey);
                     document.getElementById('google-api-key').dataset.fullKey = googleKey;
+                    document.getElementById('reveal-google-key').style.display = 'inline-block';
+                    document.getElementById('reveal-google-key').textContent = '👁️';
+                    document.getElementById('reveal-google-key').title = 'Show key';
                     document.getElementById('delete-google-key').style.display = 'inline-block';
                 }
                 
                 if (openaiKey) {
                     document.getElementById('openai-api-key').value = maskApiKey(openaiKey);
                     document.getElementById('openai-api-key').dataset.fullKey = openaiKey;
+                    document.getElementById('reveal-openai-key').style.display = 'inline-block';
+                    document.getElementById('reveal-openai-key').textContent = '👁️';
+                    document.getElementById('reveal-openai-key').title = 'Show key';
                     document.getElementById('delete-openai-key').style.display = 'inline-block';
                 }
                 
                 if (jellyfinKey) {
                     document.getElementById('jellyfin-api-key').value = maskApiKey(jellyfinKey);
                     document.getElementById('jellyfin-api-key').dataset.fullKey = jellyfinKey;
+                    document.getElementById('reveal-jellyfin-key').style.display = 'inline-block';
+                    document.getElementById('reveal-jellyfin-key').textContent = '👁️';
+                    document.getElementById('reveal-jellyfin-key').title = 'Show key';
                     document.getElementById('delete-jellyfin-key').style.display = 'inline-block';
                 }
                 
