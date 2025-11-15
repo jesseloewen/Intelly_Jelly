@@ -2,7 +2,10 @@ from flask import Flask, render_template, request, jsonify, send_from_directory,
 import threading
 import os
 import logging
+import secrets
+import hashlib
 from functools import wraps
+from datetime import datetime, timedelta
 
 from backend.config_manager import ConfigManager
 from backend.job_store import JobStore, JobStatus
@@ -32,16 +35,60 @@ library_browser = LibraryBrowser(config_manager.get('LIBRARY_PATH', './test_fold
 
 backend_thread = None
 
+# Token storage (in production, use Redis or database)
+app_tokens = {}  # {token: {password_hash: str, expires: datetime}}
+admin_tokens = {}  # {token: {password_hash: str, expires: datetime}}
+
 
 def start_backend():
     orchestrator.start()
+
+
+def generate_token():
+    return secrets.token_urlsafe(32)
+
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+def validate_app_token(token):
+    if token in app_tokens:
+        token_data = app_tokens[token]
+        if datetime.now() < token_data['expires']:
+            app_password = config_manager.get('APP_PASSWORD', '')
+            if hash_password(app_password) == token_data['password_hash']:
+                return True
+        # Token expired or password changed, remove it
+        del app_tokens[token]
+    return False
+
+
+def validate_admin_token(token):
+    if token in admin_tokens:
+        token_data = admin_tokens[token]
+        if datetime.now() < token_data['expires']:
+            admin_password = config_manager.get('ADMIN_PASSWORD', '')
+            if hash_password(admin_password) == token_data['password_hash']:
+                return True
+        # Token expired or password changed, remove it
+        del admin_tokens[token]
+    return False
 
 
 def require_app_password(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         app_password = config_manager.get('APP_PASSWORD', '')
-        if app_password and not session.get('app_authenticated'):
+        if app_password:
+            # Check session first
+            if session.get('app_authenticated'):
+                return f(*args, **kwargs)
+            # Check cookie token
+            token = request.cookies.get('app_token')
+            if token and validate_app_token(token):
+                session['app_authenticated'] = True
+                return f(*args, **kwargs)
             return redirect(url_for('app_login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -51,7 +98,15 @@ def require_admin_password(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         admin_password = config_manager.get('ADMIN_PASSWORD', '')
-        if admin_password and not session.get('admin_authenticated'):
+        if admin_password:
+            # Check session first
+            if session.get('admin_authenticated'):
+                return f(*args, **kwargs)
+            # Check cookie token
+            token = request.cookies.get('admin_token')
+            if token and validate_admin_token(token):
+                session['admin_authenticated'] = True
+                return f(*args, **kwargs)
             return redirect(url_for('admin_login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -68,7 +123,18 @@ def app_login():
         data = request.json
         if data and data.get('password') == app_password:
             session['app_authenticated'] = True
-            return jsonify({'success': True})
+            response_data = {'success': True}
+            
+            # Generate token if remember_me is requested
+            if data.get('remember_me'):
+                token = generate_token()
+                app_tokens[token] = {
+                    'password_hash': hash_password(app_password),
+                    'expires': datetime.now() + timedelta(days=30)
+                }
+                response_data['token'] = token
+            
+            return jsonify(response_data)
         return jsonify({'success': False, 'error': 'Invalid password'}), 401
     
     return render_template('app_login.html')
@@ -85,10 +151,43 @@ def admin_login():
         data = request.json
         if data and data.get('password') == admin_password:
             session['admin_authenticated'] = True
-            return jsonify({'success': True})
+            response_data = {'success': True}
+            
+            # Generate token if remember_me is requested
+            if data.get('remember_me'):
+                token = generate_token()
+                admin_tokens[token] = {
+                    'password_hash': hash_password(admin_password),
+                    'expires': datetime.now() + timedelta(days=30)
+                }
+                response_data['token'] = token
+            
+            return jsonify(response_data)
         return jsonify({'success': False, 'error': 'Invalid password'}), 401
     
     return render_template('admin_login.html')
+
+
+@app.route('/api/validate-app-token', methods=['POST'])
+def validate_app_token_endpoint():
+    data = request.json
+    if data and data.get('token'):
+        token = data.get('token')
+        if validate_app_token(token):
+            session['app_authenticated'] = True
+            return jsonify({'valid': True})
+    return jsonify({'valid': False})
+
+
+@app.route('/api/validate-admin-token', methods=['POST'])
+def validate_admin_token_endpoint():
+    data = request.json
+    if data and data.get('token'):
+        token = data.get('token')
+        if validate_admin_token(token):
+            session['admin_authenticated'] = True
+            return jsonify({'valid': True})
+    return jsonify({'valid': False})
 
 
 @app.route('/logout')

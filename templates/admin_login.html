@@ -164,6 +164,13 @@
                 <input type="password" id="password" name="password" required autofocus>
             </div>
             
+            <div class="form-group">
+                <div class="checkbox-group" style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="remember-me" name="remember-me" style="width: auto; margin: 0;">
+                    <label for="remember-me" style="margin: 0; font-weight: normal;">Remember me on this device</label>
+                </div>
+            </div>
+            
             <button type="submit" class="login-btn" id="login-btn">Login</button>
         </form>
         
@@ -173,16 +180,35 @@
     </div>
     
     <script>
+        // Cookie utility functions
+        function setCookie(name, value, days = 365) {
+            const date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            const expires = "expires=" + date.toUTCString();
+            document.cookie = name + "=" + value + ";" + expires + ";path=/;SameSite=Lax";
+        }
+        
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        }
+        
         function toggleTheme() {
             const currentTheme = document.documentElement.getAttribute('data-theme');
             const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
             document.documentElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
+            setCookie('intelly-jelly-theme', newTheme);
             updateThemeIcon(newTheme);
         }
         
         function initTheme() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
+            const savedTheme = getCookie('intelly-jelly-theme') || 'light';
             document.documentElement.setAttribute('data-theme', savedTheme);
             updateThemeIcon(savedTheme);
         }
@@ -200,6 +226,31 @@
         
         initTheme();
         
+        // Check for saved token on page load
+        async function checkSavedToken() {
+            const token = getCookie('admin_token');
+            if (token) {
+                try {
+                    const response = await fetch('/api/validate-admin-token', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ token })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.valid) {
+                        window.location.href = '/settings';
+                    }
+                } catch (error) {
+                    // Token invalid or expired, continue to login form
+                }
+            }
+        }
+        
+        checkSavedToken();
+        
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -208,6 +259,7 @@
             btn.textContent = 'Logging in...';
             
             const password = document.getElementById('password').value;
+            const rememberMe = document.getElementById('remember-me').checked;
             
             try {
                 const response = await fetch('/admin-login', {
@@ -215,12 +267,15 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ password })
+                    body: JSON.stringify({ password, remember_me: rememberMe })
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
+                    if (rememberMe && data.token) {
+                        setCookie('admin_token', data.token, 30); // 30 days
+                    }
                     window.location.href = '/settings';
                 } else {
                     showError(data.error || 'Invalid password');
