@@ -92,7 +92,7 @@
         }
         
         .settings-section h3 {
-            color: var(--text-primary);
+            color: var(--heading-color);
             margin-bottom: 20px;
             font-size: 18px;
         }
@@ -387,12 +387,9 @@
                     <a href="/settings">Settings</a>
                     <a href="/logs">Logs</a>
                 </div>
-                <div class="theme-selector">
-                    <select id="theme-select" onchange="changeTheme(this.value)">
-                        <option value="dark">🌙 Dark</option>
-                        <option value="light">☀️ Light</option>
-                    </select>
-                </div>
+                <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">
+                    <span id="theme-icon">🌙</span>
+                </button>
             </div>
         </header>
         
@@ -429,7 +426,7 @@
                 
                 <div class="settings-section">
                     <h3>AI Configuration</h3>
-                    <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Jobs are processed one at a time in queue order for optimal reliability.</p>
+                    <p style="font-size: 14px; margin-bottom: 20px; color: var(--text-secondary);">Jobs are processed one at a time in queue order for optimal reliability.</p>
                     
                     <div class="form-group">
                         <label for="ai-model">AI Model <span id="model-loading" class="loading" style="display: none;"></span></label>
@@ -488,12 +485,20 @@
         function initTheme() {
             const savedTheme = localStorage.getItem('intelly-jelly-theme') || 'dark';
             document.documentElement.setAttribute('data-theme', savedTheme);
-            document.getElementById('theme-select').value = savedTheme;
+            updateThemeIcon(savedTheme);
         }
         
-        function changeTheme(theme) {
-            document.documentElement.setAttribute('data-theme', theme);
-            localStorage.setItem('intelly-jelly-theme', theme);
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('intelly-jelly-theme', newTheme);
+            updateThemeIcon(newTheme);
+        }
+        
+        function updateThemeIcon(theme) {
+            const icon = document.getElementById('theme-icon');
+            icon.textContent = theme === 'dark' ? '🌙' : '☀️';
         }
         
         // Initialize theme on page load
