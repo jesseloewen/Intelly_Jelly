@@ -233,12 +233,12 @@ header {
     box-shadow: 0 4px 6px var(--shadow-color);
 }
 
-h1, h2, h3 {
+h1, h2, h3, h4 {
     color: var(--heading-color);
 }
 
 .nav-links a {
-    color: var(--heading-color);
+    color: var(--primary-color);
 }
 
 .nav-links a:hover {
