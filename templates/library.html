@@ -903,7 +903,9 @@
             removeFromPending(currentName);
             
             document.getElementById('rename-modal').classList.remove('active');
+            // Reset the file path after closing
             currentFilePath = null;
+            currentHasSubtitle = false;
         }
         
         async function saveRename() {
@@ -948,18 +950,28 @@
         }
         
         function openReAIModal(file) {
+            console.log('Opening Re-AI modal for file:', file);
             currentFilePath = file.full_path;
+            currentHasSubtitle = file.is_video && (file.has_subtitle || false);
             document.getElementById('reai-current-name').value = file.filename;
             document.getElementById('reai-prompt').value = '';
             document.getElementById('reai-modal').classList.add('active');
+            console.log('currentFilePath set to:', currentFilePath);
         }
         
         function closeReAIModal() {
             document.getElementById('reai-modal').classList.remove('active');
-            currentFilePath = null;
+            // Don't reset currentFilePath here - we need it for processing
         }
         
         async function processReAI() {
+            console.log('processReAI called, currentFilePath:', currentFilePath);
+            
+            if (!currentFilePath) {
+                alert('Error: No file selected for AI processing');
+                return;
+            }
+            
             let customPrompt = document.getElementById('reai-prompt').value;
             const includeInstructions = document.getElementById('reai-include-instructions').checked;
             const includeFilename = document.getElementById('reai-include-filename').checked;
@@ -988,18 +1000,22 @@
             addToPending(currentFilename, 'Processing with AI...');
             
             try {
+                console.log('Sending request with file_path:', currentFilePath);
+                const requestBody = {
+                    file_path: currentFilePath,
+                    custom_prompt: customPrompt || null,
+                    include_instructions: includeInstructions,
+                    include_filename: includeFilename,
+                    enable_web_search: enableWebSearch
+                };
+                console.log('Request body:', requestBody);
+                
                 const response = await fetch('/api/library/re-ai', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        file_path: currentFilePath,
-                        custom_prompt: customPrompt || null,
-                        include_instructions: includeInstructions,
-                        include_filename: includeFilename,
-                        enable_web_search: enableWebSearch
-                    })
+                    body: JSON.stringify(requestBody)
                 });
                 
                 // Hide loading overlay
@@ -1010,33 +1026,18 @@
                 if (result.success) {
                     updatePendingStatus(currentFilename, 'AI processing complete - ready to rename', result.confidence);
                     
-                    // Fetch fresh file data to get subtitle info
-                    const filesResponse = await fetch(`/api/library/files?page=${currentPage}&search=${encodeURIComponent(currentSearch)}&dir=${encodeURIComponent(currentDir)}`);
-                    const filesData = await filesResponse.json();
-                    const file = filesData.items.find(f => f.full_path === currentFilePath && !f.is_folder);
+                    // Open rename modal with suggested name
+                    // currentFilePath and currentHasSubtitle are already set from openReAIModal
+                    document.getElementById('current-name').value = currentFilename;
+                    document.getElementById('new-name').value = result.suggested_name;
                     
-                    if (file) {
-                        // Store file info for rename
-                        currentHasSubtitle = file.is_video && (file.has_subtitle || false);
-                        
-                        // Open rename modal with suggested name
-                        document.getElementById('current-name').value = file.filename;
-                        document.getElementById('new-name').value = result.suggested_name;
-                        
-                        if (currentHasSubtitle) {
-                            document.getElementById('subtitle-option').style.display = 'block';
-                        } else {
-                            document.getElementById('subtitle-option').style.display = 'none';
-                        }
-                        
-                        document.getElementById('rename-modal').classList.add('active');
+                    if (currentHasSubtitle) {
+                        document.getElementById('subtitle-option').style.display = 'block';
                     } else {
-                        // File not found in current view, still allow rename
-                        document.getElementById('current-name').value = currentFilename;
-                        document.getElementById('new-name').value = result.suggested_name;
                         document.getElementById('subtitle-option').style.display = 'none';
-                        document.getElementById('rename-modal').classList.add('active');
                     }
+                    
+                    document.getElementById('rename-modal').classList.add('active');
                 } else {
                     removeFromPending(currentFilename);
                     alert('Error: ' + (result.error || 'Unknown error'));
