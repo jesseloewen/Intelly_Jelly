@@ -1,25 +1,25 @@
 /* Intelly Jelly Theme System */
 
-/* Root variables - default to dark theme */
+/* Root variables - default to dark theme (Midnight) */
 :root {
-    --bg-gradient-start: #0f0f1e;
-    --bg-gradient-end: #1a1a2e;
-    --primary-color: #7c8aff;
-    --primary-hover: #6b7aef;
-    --secondary-color: #9b59b6;
-    --card-bg: #1e1e2e;
-    --card-text: #e8e8f0;
-    --heading-color: #a8b3ff;
-    --text-primary: #e8e8f0;
-    --text-secondary: #a0a0b8;
-    --border-color: #2d2d44;
-    --input-bg: #16161f;
-    --input-border: #3d3d5c;
-    --input-text: #e8e8f0;
-    --table-header-bg: #16161f;
-    --table-row-hover: #252535;
-    --modal-bg: #1e1e2e;
-    --shadow-color: rgba(0, 0, 0, 0.5);
+    --bg-gradient-start: #010409;
+    --bg-gradient-end: #0a0e14;
+    --primary-color: #79c0ff;
+    --primary-hover: #58a6ff;
+    --secondary-color: #1f6feb;
+    --card-bg: #0d1117;
+    --card-text: #e6edf3;
+    --heading-color: #79c0ff;
+    --text-primary: #e6edf3;
+    --text-secondary: #9198a1;
+    --border-color: #21262d;
+    --input-bg: #010409;
+    --input-border: #30363d;
+    --input-text: #e6edf3;
+    --table-header-bg: #010409;
+    --table-row-hover: #161b22;
+    --modal-bg: #0d1117;
+    --shadow-color: rgba(0, 0, 0, 0.7);
     --status-queued-bg: #ffd700;
     --status-queued-text: #8b6914;
     --status-processing-bg: #74b9ff;
@@ -38,7 +38,7 @@
     --success-bg: #1f4a3f;
     --success-text: #55efc4;
     --success-border: #00b894;
-    --nav-hover: rgba(255, 255, 255, 0.1);
+    --nav-hover: rgba(121, 192, 255, 0.1);
 }
 
 /* Light Theme */
@@ -82,27 +82,27 @@
     --nav-hover: #ede7f6;
 }
 
-/* Dark Theme (modern blue-purple) */
+/* Dark Theme (Midnight) */
 [data-theme="dark"] {
-    --bg-gradient-start: #0f0f1e;
-    --bg-gradient-end: #1a1a2e;
-    --primary-color: #7c8aff;
-    --primary-hover: #6b7aef;
-    --secondary-color: #9b59b6;
-    --card-bg: #1e1e2e;
-    --card-text: #e8e8f0;
-    --heading-color: #a8b3ff;
-    --text-primary: #e8e8f0;
-    --text-secondary: #a0a0b8;
-    --border-color: #2d2d44;
-    --input-bg: #16161f;
-    --input-border: #3d3d5c;
-    --input-text: #e8e8f0;
-    --table-header-bg: #16161f;
-    --table-row-hover: #252535;
-    --modal-bg: #1e1e2e;
-    --shadow-color: rgba(0, 0, 0, 0.5);
-    --nav-hover: rgba(255, 255, 255, 0.1);
+    --bg-gradient-start: #010409;
+    --bg-gradient-end: #0a0e14;
+    --primary-color: #79c0ff;
+    --primary-hover: #58a6ff;
+    --secondary-color: #1f6feb;
+    --card-bg: #0d1117;
+    --card-text: #e6edf3;
+    --heading-color: #79c0ff;
+    --text-primary: #e6edf3;
+    --text-secondary: #9198a1;
+    --border-color: #21262d;
+    --input-bg: #010409;
+    --input-border: #30363d;
+    --input-text: #e6edf3;
+    --table-header-bg: #010409;
+    --table-row-hover: #161b22;
+    --modal-bg: #0d1117;
+    --shadow-color: rgba(0, 0, 0, 0.7);
+    --nav-hover: rgba(121, 192, 255, 0.1);
 }
 
 /* Ocean Theme */
@@ -340,8 +340,12 @@ h1, h2, h3 {
     color: var(--text-secondary);
 }
 
+.settings-header h2 {
+    color: var(--heading-color);
+}
+
 .settings-header p {
-    color: var(--text-secondary);
+    color: var(--text-primary);
 }
 
 .checkbox-group {

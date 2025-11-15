@@ -72,12 +72,12 @@
         }
         
         .settings-header h2 {
-            color: #333;
+            color: var(--heading-color);
             margin-bottom: 10px;
         }
         
         .settings-header p {
-            color: #666;
+            color: var(--text-primary);
             font-size: 14px;
         }
         
@@ -389,13 +389,8 @@
                 </div>
                 <div class="theme-selector">
                     <select id="theme-select" onchange="changeTheme(this.value)">
-                        <option value="dark">Dark</option>
-                        <option value="light">Light</option>
-                        <option value="ocean">Ocean</option>
-                        <option value="forest">Forest</option>
-                        <option value="sunset">Sunset</option>
-                        <option value="midnight">Midnight</option>
-                        <option value="cherry">Cherry Blossom</option>
+                        <option value="dark">🌙 Dark</option>
+                        <option value="light">☀️ Light</option>
                     </select>
                 </div>
             </div>
