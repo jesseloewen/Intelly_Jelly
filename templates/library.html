@@ -366,6 +366,96 @@
             margin-top: 5px;
         }
         
+        .pending-renames {
+            background: #fff9e6;
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .pending-renames.active {
+            display: block;
+        }
+        
+        .pending-renames h3 {
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .pending-item {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            border-left: 4px solid #a29bfe;
+        }
+        
+        .pending-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .pending-item .file-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .pending-item .status {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+        }
+        
+        .loading-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .loading-content .spinner {
+            width: 40px;
+            height: 40px;
+            border-width: 4px;
+            margin-bottom: 15px;
+        }
+        
         /* Mobile Responsive */
         @media (max-width: 768px) {
             body {
@@ -419,10 +509,10 @@
         <header>
             <h1>🍇 Intelly Jelly - Library</h1>
             <div class="nav-links">
-                <a href="/">Dashboard</a>
+                <a href="/">Downloads</a>
+                <a href="/library">Library</a>
                 <a href="/settings">Settings</a>
                 <a href="/logs">Logs</a>
-                <a href="/library">Library</a>
             </div>
         </header>
         
@@ -445,6 +535,14 @@
             </div>
         </div>
         
+        <div class="pending-renames" id="pending-renames">
+            <h3>
+                <span class="spinner"></span>
+                AI Processing Queue
+            </h3>
+            <div id="pending-list"></div>
+        </div>
+        
         <div class="library-container">
             <div class="library-header">
                 <h2>Library Files</h2>
@@ -458,6 +556,14 @@
             <div id="files-list"></div>
             
             <div class="pagination" id="pagination"></div>
+        </div>
+        
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loading-overlay">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p>Processing with AI...</p>
+            </div>
         </div>
     </div>
     
@@ -536,6 +642,8 @@
         let currentSortOrder = 'desc';
         let currentFilePath = null;
         let currentHasSubtitle = false;
+        let currentDir = '';
+        let pendingRenames = [];
         
         function formatFileSize(bytes) {
             if (bytes === 0) return '0 B';
@@ -560,14 +668,61 @@
         
         async function loadFiles() {
             try {
-                const response = await fetch(`/api/library/files?page=${currentPage}&search=${encodeURIComponent(currentSearch)}&sort_by=${currentSort}&sort_order=${currentSortOrder}`);
+                const response = await fetch(`/api/library/files?page=${currentPage}&search=${encodeURIComponent(currentSearch)}&sort_by=${currentSort}&sort_order=${currentSortOrder}&dir=${encodeURIComponent(currentDir)}`);
                 const data = await response.json();
                 
                 updateStats(data.stats);
-                displayFiles(data.files);
+                displayFiles(data.items, data.has_parent, data.parent_dir, data.current_dir);
                 displayPagination(data.pagination);
+                updatePendingRenames();
             } catch (error) {
                 console.error('Error loading files:', error);
+            }
+        }
+        
+        function updatePendingRenames() {
+            const pendingDiv = document.getElementById('pending-renames');
+            const pendingList = document.getElementById('pending-list');
+            
+            if (pendingRenames.length === 0) {
+                pendingDiv.classList.remove('active');
+                return;
+            }
+            
+            pendingDiv.classList.add('active');
+            
+            let html = '';
+            pendingRenames.forEach(item => {
+                const confidenceText = item.confidence ? ` (Confidence: ${item.confidence}%)` : '';
+                html += `
+                    <div class="pending-item">
+                        <div class="file-name">${item.filename}</div>
+                        <div class="status">${item.status}${confidenceText}</div>
+                    </div>
+                `;
+            });
+            
+            pendingList.innerHTML = html;
+        }
+        
+        function addToPending(filename, status, confidence = null) {
+            pendingRenames.push({ filename, status, confidence });
+            updatePendingRenames();
+        }
+        
+        function removeFromPending(filename) {
+            pendingRenames = pendingRenames.filter(item => item.filename !== filename);
+            updatePendingRenames();
+        }
+        
+        function updatePendingStatus(filename, status, confidence = null) {
+            const item = pendingRenames.find(item => item.filename === filename);
+            if (item) {
+                item.status = status;
+                if (confidence !== null) {
+                    item.confidence = confidence;
+                }
+                updatePendingRenames();
             }
         }
         
@@ -578,10 +733,10 @@
             document.getElementById('stat-size').textContent = formatFileSize(stats.total_size || 0);
         }
         
-        function displayFiles(files) {
+        function displayFiles(items, hasParent, parentDir, currentDirectory) {
             const filesList = document.getElementById('files-list');
             
-            if (files.length === 0) {
+            if (items.length === 0 && !hasParent) {
                 filesList.innerHTML = `
                     <div class="empty-state">
                         <div class="empty-state-icon">📁</div>
@@ -595,8 +750,8 @@
                 <table class="files-table">
                     <thead>
                         <tr>
-                            <th onclick="sortBy('filename')">File Name ${currentSort === 'filename' ? (currentSortOrder === 'asc' ? '↑' : '↓') : ''}</th>
-                            <th>Directory</th>
+                            <th onclick="sortBy('filename')">Name ${currentSort === 'filename' ? (currentSortOrder === 'asc' ? '↑' : '↓') : ''}</th>
+                            <th>Path</th>
                             <th onclick="sortBy('size')">Size ${currentSort === 'size' ? (currentSortOrder === 'asc' ? '↑' : '↓') : ''}</th>
                             <th onclick="sortBy('modified')">Modified ${currentSort === 'modified' ? (currentSortOrder === 'asc' ? '↑' : '↓') : ''}</th>
                             <th>Actions</th>
@@ -605,27 +760,57 @@
                     <tbody>
             `;
             
-            files.forEach(file => {
-                const icon = getFileIcon(file.extension, file.is_video);
-                const subtitleBadge = file.is_video && file.has_subtitle ? '<span class="subtitle-badge">SUB</span>' : '';
-                
+            // Add parent directory row if not at root
+            if (hasParent) {
                 html += `
-                    <tr>
-                        <td>
-                            <span class="file-icon">${icon}</span>
-                            ${file.filename}${subtitleBadge}
-                        </td>
-                        <td class="path-text">${file.directory || '/'}</td>
-                        <td class="file-size">${formatFileSize(file.size)}</td>
-                        <td>${formatDate(file.modified)}</td>
-                        <td>
-                            <div class="actions">
-                                <button class="btn btn-small btn-edit" onclick='openRenameModal(${JSON.stringify(file)})'>Rename</button>
-                                <button class="btn btn-small btn-reai" onclick='openReAIModal(${JSON.stringify(file)})'>Re-AI</button>
-                            </div>
+                    <tr style="background: #f8f9fa;">
+                        <td colspan="5" style="cursor: pointer;" onclick="navigateToDir('${parentDir || ''}')">
+                            <span class="file-icon">📁</span>
+                            <strong>.. (Go Back)</strong>
                         </td>
                     </tr>
                 `;
+            }
+            
+            // Display folders and files
+            items.forEach(item => {
+                if (item.is_folder) {
+                    // It's a folder
+                    html += `
+                        <tr style="cursor: pointer; background: #fafbfc;" onclick="navigateToDir('${item.relative_path}')">
+                            <td>
+                                <span class="file-icon">📁</span>
+                                <strong>${item.name}</strong>
+                            </td>
+                            <td class="path-text">${item.relative_path}</td>
+                            <td class="file-size">${item.file_count} files</td>
+                            <td>-</td>
+                            <td>-</td>
+                        </tr>
+                    `;
+                } else {
+                    // It's a file
+                    const icon = getFileIcon(item.extension, item.is_video);
+                    const subtitleBadge = item.is_video && item.has_subtitle ? '<span class="subtitle-badge">SUB</span>' : '';
+                    
+                    html += `
+                        <tr>
+                            <td>
+                                <span class="file-icon">${icon}</span>
+                                ${item.filename}${subtitleBadge}
+                            </td>
+                            <td class="path-text">${currentDirectory || '/'}</td>
+                            <td class="file-size">${formatFileSize(item.size)}</td>
+                            <td>${formatDate(item.modified)}</td>
+                            <td>
+                                <div class="actions">
+                                    <button class="btn btn-small btn-edit" onclick='openRenameModal(${JSON.stringify(item)})'>Rename</button>
+                                    <button class="btn btn-small btn-reai" onclick='openReAIModal(${JSON.stringify(item)})'>Re-AI</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }
             });
             
             html += `
@@ -634,6 +819,12 @@
             `;
             
             filesList.innerHTML = html;
+        }
+        
+        function navigateToDir(dir) {
+            currentDir = dir;
+            currentPage = 1;
+            loadFiles();
         }
         
         function displayPagination(pagination) {
@@ -671,6 +862,7 @@
         function searchFiles() {
             currentSearch = document.getElementById('search-input').value;
             currentPage = 1;
+            currentDir = ''; // Search globally, reset to root
             loadFiles();
         }
         
@@ -705,11 +897,17 @@
         }
         
         function closeRenameModal() {
+            const currentName = document.getElementById('current-name').value;
+            
+            // If closing without saving, remove from pending queue
+            removeFromPending(currentName);
+            
             document.getElementById('rename-modal').classList.remove('active');
             currentFilePath = null;
         }
         
         async function saveRename() {
+            const currentName = document.getElementById('current-name').value;
             const newName = document.getElementById('new-name').value.trim();
             const renameSubtitle = document.getElementById('rename-subtitle').checked;
             
@@ -734,6 +932,9 @@
                 const result = await response.json();
                 
                 if (result.success) {
+                    // Remove from pending queue
+                    removeFromPending(currentName);
+                    
                     closeRenameModal();
                     loadFiles();
                     alert(result.message);
@@ -742,7 +943,7 @@
                 }
             } catch (error) {
                 console.error('Error renaming file:', error);
-                alert('Error renaming file');
+                alert('Error renaming file: ' + error.message);
             }
         }
         
@@ -764,6 +965,9 @@
             const includeFilename = document.getElementById('reai-include-filename').checked;
             const enableWebSearch = document.getElementById('reai-web-search').checked;
             
+            // Get the current filename for tracking
+            const currentFilename = document.getElementById('reai-current-name').value;
+            
             // If instructions are not included but custom prompt is provided,
             // append JSON formatting instructions
             if (!includeInstructions && customPrompt) {
@@ -775,6 +979,13 @@
                     '}]';
                 customPrompt = customPrompt + jsonInstructions;
             }
+            
+            // Close modal and show loading
+            closeReAIModal();
+            document.getElementById('loading-overlay').classList.add('active');
+            
+            // Add to pending queue
+            addToPending(currentFilename, 'Processing with AI...');
             
             try {
                 const response = await fetch('/api/library/re-ai', {
@@ -791,18 +1002,24 @@
                     })
                 });
                 
+                // Hide loading overlay
+                document.getElementById('loading-overlay').classList.remove('active');
+                
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Close Re-AI modal and open rename modal with suggested name
-                    closeReAIModal();
+                    updatePendingStatus(currentFilename, 'AI processing complete - ready to rename', result.confidence);
                     
-                    // Find the file info
-                    const files = await fetch(`/api/library/files?page=${currentPage}&search=${encodeURIComponent(currentSearch)}`).then(r => r.json());
-                    const file = files.files.find(f => f.full_path === currentFilePath);
+                    // Fetch fresh file data to get subtitle info
+                    const filesResponse = await fetch(`/api/library/files?page=${currentPage}&search=${encodeURIComponent(currentSearch)}&dir=${encodeURIComponent(currentDir)}`);
+                    const filesData = await filesResponse.json();
+                    const file = filesData.items.find(f => f.full_path === currentFilePath && !f.is_folder);
                     
                     if (file) {
-                        currentHasSubtitle = file.is_video && file.has_subtitle;
+                        // Store file info for rename
+                        currentHasSubtitle = file.is_video && (file.has_subtitle || false);
+                        
+                        // Open rename modal with suggested name
                         document.getElementById('current-name').value = file.filename;
                         document.getElementById('new-name').value = result.suggested_name;
                         
@@ -813,13 +1030,22 @@
                         }
                         
                         document.getElementById('rename-modal').classList.add('active');
+                    } else {
+                        // File not found in current view, still allow rename
+                        document.getElementById('current-name').value = currentFilename;
+                        document.getElementById('new-name').value = result.suggested_name;
+                        document.getElementById('subtitle-option').style.display = 'none';
+                        document.getElementById('rename-modal').classList.add('active');
                     }
                 } else {
+                    removeFromPending(currentFilename);
                     alert('Error: ' + (result.error || 'Unknown error'));
                 }
             } catch (error) {
+                document.getElementById('loading-overlay').classList.remove('active');
+                removeFromPending(currentFilename);
                 console.error('Error processing with AI:', error);
-                alert('Error processing with AI');
+                alert('Error processing with AI: ' + error.message);
             }
         }
         

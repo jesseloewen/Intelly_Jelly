@@ -233,6 +233,7 @@ def get_library_files():
         search = request.args.get('search', None, type=str)
         sort_by = request.args.get('sort_by', 'modified', type=str)
         sort_order = request.args.get('sort_order', 'desc', type=str)
+        current_dir = request.args.get('dir', '', type=str)
         
         # Update library path in case config changed
         library_browser.update_library_path(config_manager.get('LIBRARY_PATH'))
@@ -242,7 +243,8 @@ def get_library_files():
             per_page=per_page,
             search=search,
             sort_by=sort_by,
-            sort_order=sort_order
+            sort_order=sort_order,
+            current_dir=current_dir
         )
         return jsonify(result)
     except Exception as e:

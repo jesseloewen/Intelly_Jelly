@@ -58,10 +58,100 @@ class LibraryBrowser:
         
         return files
     
-    def get_files_paginated(self, page: int = 1, per_page: int = 50, search: Optional[str] = None, 
-                           sort_by: str = 'modified', sort_order: str = 'desc') -> Dict:
+    def _get_directory_contents(self, current_dir: str) -> Tuple[List[Dict], List[Dict]]:
         """
-        Get files with pagination.
+        Get folders and files in a specific directory (non-recursive).
+        
+        Args:
+            current_dir: Relative path from library root (empty string for root)
+            
+        Returns:
+            Tuple of (folders_list, files_list)
+        """
+        folders = []
+        files = []
+        
+        # Build full path
+        if current_dir:
+            full_path = os.path.join(self.library_path, current_dir)
+        else:
+            full_path = self.library_path
+        
+        if not os.path.exists(full_path):
+            logger.warning(f"Directory does not exist: {full_path}")
+            return folders, files
+        
+        try:
+            # Get immediate children only
+            items = os.listdir(full_path)
+            
+            for item in items:
+                item_path = os.path.join(full_path, item)
+                
+                if os.path.isdir(item_path):
+                    # It's a folder
+                    folder_rel_path = os.path.join(current_dir, item) if current_dir else item
+                    
+                    # Count files in this folder (recursively)
+                    file_count = 0
+                    try:
+                        for root, dirs, filenames in os.walk(item_path):
+                            file_count += len([f for f in filenames if os.path.splitext(f)[1].lower() in self.supported_extensions])
+                    except:
+                        pass
+                    
+                    folders.append({
+                        'name': item,
+                        'relative_path': folder_rel_path,
+                        'full_path': item_path,
+                        'file_count': file_count,
+                        'is_folder': True
+                    })
+                
+                elif os.path.isfile(item_path):
+                    # It's a file
+                    file_ext = os.path.splitext(item)[1].lower()
+                    
+                    # Only include supported file types
+                    if file_ext in self.supported_extensions:
+                        file_rel_path = os.path.join(current_dir, item) if current_dir else item
+                        file_size = os.path.getsize(item_path)
+                        modified_time = os.path.getmtime(item_path)
+                        is_video = file_ext in self.video_extensions
+                        
+                        # Check for subtitle if it's a video
+                        has_subtitle = False
+                        if is_video:
+                            subtitle_path = self.find_related_subtitle(item_path)
+                            has_subtitle = subtitle_path is not None
+                        
+                        files.append({
+                            'filename': item,
+                            'full_path': item_path,
+                            'relative_path': file_rel_path,
+                            'directory': current_dir,
+                            'extension': file_ext,
+                            'size': file_size,
+                            'modified': modified_time,
+                            'is_video': is_video,
+                            'is_subtitle': file_ext in self.subtitle_extensions,
+                            'has_subtitle': has_subtitle,
+                            'is_folder': False
+                        })
+        
+        except Exception as e:
+            logger.error(f"Error scanning directory: {type(e).__name__}: {e}", exc_info=True)
+        
+        # Sort folders alphabetically
+        folders.sort(key=lambda x: x['name'].lower())
+        
+        return folders, files
+    
+    def get_files_paginated(self, page: int = 1, per_page: int = 50, search: Optional[str] = None, 
+                           sort_by: str = 'modified', sort_order: str = 'desc', 
+                           current_dir: str = '') -> Dict:
+        """
+        Get files with pagination, supporting directory navigation.
         
         Args:
             page: Page number (1-indexed)
@@ -69,17 +159,21 @@ class LibraryBrowser:
             search: Optional search filter
             sort_by: Field to sort by (filename, modified, size)
             sort_order: Sort order (asc, desc)
+            current_dir: Current directory relative to library root (empty for root)
             
         Returns:
-            Dictionary with files, pagination info, and stats
+            Dictionary with folders, files, pagination info, and stats
         """
-        all_files = self._get_all_files()
-        
-        # Filter by search if provided
+        # If searching, use recursive search across all files
         if search:
+            all_files = self._get_all_files()
             search_lower = search.lower()
             all_files = [f for f in all_files if search_lower in f['filename'].lower() 
                         or search_lower in f['relative_path'].lower()]
+            folders = []
+        else:
+            # Get directory contents (non-recursive)
+            folders, all_files = self._get_directory_contents(current_dir)
         
         # Sort files
         reverse = (sort_order == 'desc')
@@ -90,30 +184,44 @@ class LibraryBrowser:
         else:  # modified
             all_files.sort(key=lambda x: x['modified'], reverse=reverse)
         
+        # Combine folders and files for pagination
+        all_items = folders + all_files
+        
         # Calculate pagination
-        total_files = len(all_files)
-        total_pages = math.ceil(total_files / per_page) if total_files > 0 else 1
+        total_items = len(all_items)
+        total_pages = math.ceil(total_items / per_page) if total_items > 0 else 1
         page = max(1, min(page, total_pages))  # Clamp page to valid range
         
         start_idx = (page - 1) * per_page
         end_idx = start_idx + per_page
-        page_files = all_files[start_idx:end_idx]
+        page_items = all_items[start_idx:end_idx]
+        
+        # Calculate parent directory
+        parent_dir = None
+        if current_dir:
+            parent_dir = os.path.dirname(current_dir)
+        
+        # Get all files recursively for stats
+        all_files_recursive = self._get_all_files()
         
         return {
-            'files': page_files,
+            'items': page_items,
+            'current_dir': current_dir,
+            'parent_dir': parent_dir,
+            'has_parent': bool(current_dir),
             'pagination': {
                 'current_page': page,
                 'per_page': per_page,
-                'total_files': total_files,
+                'total_items': total_items,
                 'total_pages': total_pages,
                 'has_previous': page > 1,
                 'has_next': page < total_pages
             },
             'stats': {
-                'total_files': total_files,
-                'video_files': len([f for f in all_files if f['is_video']]),
-                'subtitle_files': len([f for f in all_files if f['is_subtitle']]),
-                'total_size': sum(f['size'] for f in all_files)
+                'total_files': len(all_files_recursive),
+                'video_files': len([f for f in all_files_recursive if f.get('is_video')]),
+                'subtitle_files': len([f for f in all_files_recursive if f.get('is_subtitle')]),
+                'total_size': sum(f.get('size', 0) for f in all_files_recursive)
             }
         }
     
