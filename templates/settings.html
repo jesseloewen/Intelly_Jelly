@@ -949,7 +949,7 @@
         
         function maskApiKey(key) {
             if (!key || key.length <= 4) return key;
-            return '•'.repeat(key.length - 4) + key.slice(-4);
+            return '...' + key.slice(-4);
         }
         
         function deleteApiKey(keyType) {
