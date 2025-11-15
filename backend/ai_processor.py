@@ -4,6 +4,7 @@ import os
 import requests
 import time
 from typing import List, Dict, Optional
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +13,21 @@ class AIProcessor:
     def __init__(self, config_manager):
         self.config_manager = config_manager
         self.last_api_call_time = 0
+        self.openai_client = None
+        
+        # Hardcoded model lists
+        self.GOOGLE_MODELS = [
+            "gemini-2.5-flash",
+            "gemini-2.5-pro",
+            "custom"
+        ]
+        
+        self.OPENAI_MODELS = [
+            "gpt-5",
+            "gpt-5-mini",
+            "gpt-5-nano",
+            "custom"
+        ]
 
     def _get_instructions(self) -> str:
         # Check for custom instructions first, fall back to base instructions
@@ -59,17 +75,27 @@ class AIProcessor:
         return results[0] if results else None
     
     def process_batch(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False) -> List[Dict]:
-        """Process files using Google AI with optional web search."""
+        """Process files using configured AI provider with optional web search."""
         logger.info(f"Starting AI processing for {len(file_paths)} file(s)")
         logger.debug(f"Files to process: {file_paths}")
         logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}")
         
+        provider = self.config_manager.get('AI_PROVIDER', 'google')
+        logger.info(f"Using AI provider: {provider}")
+        
+        if provider == 'openai':
+            return self._process_batch_openai(file_paths, custom_prompt, include_default, include_filename, enable_web_search)
+        else:
+            return self._process_batch_google(file_paths, custom_prompt, include_default, include_filename, enable_web_search)
+    
+    def _process_batch_google(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False) -> List[Dict]:
+        """Process files using Google AI with optional web search."""
         api_key = self.config_manager.get('GOOGLE_API_KEY', '')
         if not api_key:
             logger.error("GOOGLE_API_KEY not found in configuration")
             raise ValueError("GOOGLE_API_KEY not set. Please configure it in Settings.")
         
-        model = self.config_manager.get('AI_MODEL', 'gemini-pro')
+        model = self.config_manager.get('AI_MODEL', 'gemini-2.5-flash')
         logger.info(f"Using AI model: {model}")
         prompt = self._prepare_batch_prompt(file_paths, custom_prompt, include_default, include_filename)
         
@@ -189,32 +215,107 @@ class AIProcessor:
             logger.error(f"Unexpected error during AI processing: {type(e).__name__}: {e}")
             raise
 
-    def get_available_models(self, provider: Optional[str] = None) -> List[str]:
-        """Get available Google AI models."""
-        logger.info("Fetching available Google AI models")
-        try:
-            models = self._get_google_models()
-            logger.info(f"Successfully fetched {len(models)} available models")
-            return models
-        except Exception as e:
-            logger.error(f"Error fetching Google models: {type(e).__name__}: {e}")
-            return []
-
-    def _get_google_models(self) -> List[str]:
-        api_key = self.config_manager.get('GOOGLE_API_KEY', '')
+    def _process_batch_openai(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False) -> List[Dict]:
+        """Process files using OpenAI with optional web search."""
+        api_key = self.config_manager.get('OPENAI_API_KEY', '')
         if not api_key:
-            logger.warning("GOOGLE_API_KEY not found in configuration, cannot fetch models")
-            return []
+            logger.error("OPENAI_API_KEY not found in configuration")
+            raise ValueError("OPENAI_API_KEY not set. Please configure it in Settings.")
         
-        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
-        logger.debug(f"Fetching models from: {url.split('?')[0]}")
+        # Initialize OpenAI client with API key
+        if not self.openai_client or os.environ.get('OPENAI_API_KEY') != api_key:
+            os.environ['OPENAI_API_KEY'] = api_key
+            self.openai_client = OpenAI()
+            logger.info("Initialized OpenAI client")
         
-        response = requests.get(url)
-        response.raise_for_status()
+        model = self.config_manager.get('AI_MODEL', 'gpt-5-mini')
+        logger.info(f"Using OpenAI model: {model}")
+        prompt = self._prepare_batch_prompt(file_paths, custom_prompt, include_default, include_filename)
         
-        logger.debug(f"Models API response status: {response.status_code}")
+        try:
+            # Enforce delay between API calls to avoid rate limiting
+            delay_seconds = self.config_manager.get('AI_CALL_DELAY_SECONDS', 2)
+            time_since_last_call = time.time() - self.last_api_call_time
+            
+            if time_since_last_call < delay_seconds:
+                wait_time = delay_seconds - time_since_last_call
+                logger.info(f"Rate limit protection: waiting {wait_time:.2f} seconds before API call")
+                time.sleep(wait_time)
+            
+            logger.info(f"Sending request to OpenAI API: {model}")
+            
+            # Log full request
+            logger.info("=" * 80)
+            logger.info("OPENAI API REQUEST")
+            logger.info("=" * 80)
+            logger.info(f"Model: {model}")
+            logger.info(f"Web Search Enabled: {enable_web_search}")
+            logger.info(f"Prompt (first 500 chars): {prompt[:500]}...")
+            logger.info(f"Full Prompt:\n{prompt}")
+            logger.info("=" * 80)
+            
+            # Use responses.create API exactly as in the example
+            response = self.openai_client.responses.create(
+                model=model,
+                input=prompt,
+                extra_body={
+                    "websearch": {
+                        "enable": enable_web_search
+                    }
+                }
+            )
+            
+            self.last_api_call_time = time.time()
+            
+            logger.info(f"Received successful response from OpenAI API")
+            
+            # Extract the text using output_text
+            text = response.output_text
+            
+            logger.info("=" * 80)
+            logger.info("OPENAI API RESPONSE")
+            logger.info("=" * 80)
+            logger.info(f"Response length: {len(text)} characters")
+            logger.info(f"Full Response:\n{text}")
+            logger.info("=" * 80)
+            
+            logger.debug(f"Raw AI response length: {len(text)} characters")
+            
+            # Parse response
+            text = text.strip()
+            if text.startswith('```json'):
+                text = text[7:]
+            if text.startswith('```'):
+                text = text[3:]
+            if text.endswith('```'):
+                text = text[:-3]
+            text = text.strip()
+            
+            logger.debug("Parsing AI response as JSON")
+            result = json.loads(text)
+            
+            if isinstance(result, dict) and 'files' in result:
+                logger.info(f"AI processing completed successfully: {len(result['files'])} results returned")
+                return result['files']
+            elif isinstance(result, list):
+                logger.info(f"AI processing completed successfully: {len(result)} results returned")
+                return result
+            else:
+                logger.warning("AI response did not contain expected format, returning empty list")
+                return []
+                
+        except Exception as e:
+            logger.error(f"OpenAI API error: {type(e).__name__}: {e}")
+            raise
+
+    def get_available_models(self, provider: Optional[str] = None) -> List[str]:
+        """Get available models for the specified provider."""
+        if not provider:
+            provider = self.config_manager.get('AI_PROVIDER', 'google')
         
-        data = response.json()
-        models = [m['name'].replace('models/', '') for m in data.get('models', [])]
-        logger.debug(f"Found {len(models)} models: {models[:5]}..." if len(models) > 5 else f"Found {len(models)} models: {models}")
-        return sorted(models)
+        logger.info(f"Fetching available models for provider: {provider}")
+        
+        if provider == 'openai':
+            return self.OPENAI_MODELS
+        else:
+            return self.GOOGLE_MODELS
