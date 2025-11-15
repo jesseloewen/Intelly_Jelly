@@ -389,6 +389,8 @@ def update_config():
         'LIBRARY_PATH',
         'AI_PROVIDER',
         'AI_MODEL',
+        'GOOGLE_MODEL',
+        'OPENAI_MODEL',
         'ENABLE_WEB_SEARCH',
         'AI_CALL_DELAY_SECONDS',
         'JELLYFIN_REFRESH_ENABLED',

@@ -53,6 +53,8 @@ class ConfigManager:
             "LIBRARY_PATH": "./test_folders/library",
             "AI_PROVIDER": "google",
             "AI_MODEL": "gemini-2.5-flash",
+            "GOOGLE_MODEL": "gemini-2.5-flash",
+            "OPENAI_MODEL": "gpt-5-mini",
             "ENABLE_WEB_SEARCH": True,
             "AI_CALL_DELAY_SECONDS": 2,
             "JELLYFIN_REFRESH_ENABLED": False,

@@ -82,19 +82,55 @@
         }
         
         .settings-section {
-            margin-bottom: 30px;
-            padding-bottom: 30px;
-            border-bottom: 1px solid #eee;
+            margin-bottom: 20px;
+            border: 1px solid var(--input-border);
+            border-radius: 8px;
+            overflow: hidden;
         }
         
         .settings-section:last-child {
-            border-bottom: none;
+            margin-bottom: 30px;
         }
         
-        .settings-section h3 {
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: var(--header-bg);
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.3s;
+        }
+        
+        .section-header:hover {
+            opacity: 0.9;
+        }
+        
+        .section-header h3 {
             color: var(--heading-color);
-            margin-bottom: 20px;
+            margin: 0;
             font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .section-toggle {
+            font-size: 20px;
+            color: var(--text-secondary);
+            transition: transform 0.3s;
+        }
+        
+        .section-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+        
+        .section-content {
+            padding: 20px;
+            display: block;
+        }
+        
+        .section-content.collapsed {
+            display: none;
         }
         
         .form-group {
@@ -650,142 +686,151 @@
             <div id="alert" class="alert"></div>
             
             <form id="settings-form">
+                <!-- 1. Folder Paths -->
                 <div class="settings-section">
-                    <h3>Folder Paths</h3>
-                    
-                    <div class="form-group">
-                        <label for="downloading-path">Downloading Path</label>
-                        <input type="text" id="downloading-path" name="DOWNLOADING_PATH" placeholder="./test_folders/downloading">
-                        <small>Path to monitor for new files</small>
+                    <div class="section-header" onclick="toggleSection('folder-paths')">
+                        <h3>Folder Paths</h3>
+                        <span class="section-toggle" id="folder-paths-toggle">▼</span>
                     </div>
-                    
-                    <div class="form-group">
-                        <label for="completed-path">Completed Path</label>
-                        <input type="text" id="completed-path" name="COMPLETED_PATH" placeholder="./test_folders/completed">
-                        <small>Path where completed downloads appear</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="library-path">Library Path</label>
-                        <input type="text" id="library-path" name="LIBRARY_PATH" placeholder="./test_folders/library">
-                        <small>Path where organized files will be stored</small>
-                    </div>
-                </div>
-                
-                <div class="settings-section">
-                    <h3>API Keys</h3>
-                    
-                    <div class="form-group">
-                        <label for="ai-provider">AI Provider</label>
-                        <select id="ai-provider" name="AI_PROVIDER" onchange="handleProviderChange()">
-                            <option value="google">Google AI</option>
-                            <option value="openai">OpenAI</option>
-                        </select>
-                        <small>Select which AI provider to use</small>
-                    </div>
-                    
-                    <div class="form-group" id="google-api-key-group">
-                        <label for="google-api-key">Google API Key</label>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <input type="text" id="google-api-key" name="GOOGLE_API_KEY" placeholder="Enter Google API Key" style="flex: 1;">
-                            <button type="button" id="delete-google-key" class="delete-key-btn" style="display: none;" onclick="deleteApiKey('google')">Delete</button>
+                    <div class="section-content" id="folder-paths-content">
+                        <div class="form-group">
+                            <label for="downloading-path">Downloading Path</label>
+                            <input type="text" id="downloading-path" name="DOWNLOADING_PATH" placeholder="./test_folders/downloading">
+                            <small>Path to monitor for new files</small>
                         </div>
-                        <small>Required for Google AI-powered file organization</small>
-                    </div>
-                    
-                    <div class="form-group" id="openai-api-key-group" style="display: none;">
-                        <label for="openai-api-key">OpenAI API Key</label>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <input type="text" id="openai-api-key" name="OPENAI_API_KEY" placeholder="Enter OpenAI API Key" style="flex: 1;">
-                            <button type="button" id="delete-openai-key" class="delete-key-btn" style="display: none;" onclick="deleteApiKey('openai')">Delete</button>
+                        
+                        <div class="form-group">
+                            <label for="completed-path">Completed Path</label>
+                            <input type="text" id="completed-path" name="COMPLETED_PATH" placeholder="./test_folders/completed">
+                            <small>Path where completed downloads appear</small>
                         </div>
-                        <small>Required for OpenAI-powered file organization</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="jellyfin-api-key">Jellyfin API Key</label>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <input type="text" id="jellyfin-api-key" name="JELLYFIN_API_KEY" placeholder="Enter Jellyfin API Key" style="flex: 1;">
-                            <button type="button" id="delete-jellyfin-key" class="delete-key-btn" style="display: none;" onclick="deleteApiKey('jellyfin')">Delete</button>
+                        
+                        <div class="form-group">
+                            <label for="library-path">Library Path</label>
+                            <input type="text" id="library-path" name="LIBRARY_PATH" placeholder="./test_folders/library">
+                            <small>Path where organized files will be stored</small>
                         </div>
-                        <small>Required for automatic Jellyfin library refresh</small>
                     </div>
                 </div>
                 
+                <!-- 2. AI Configuration -->
                 <div class="settings-section">
-                    <h3>AI Configuration</h3>
-                    <p style="font-size: 14px; margin-bottom: 20px; color: var(--text-secondary);">Jobs are processed one at a time in queue order for optimal reliability.</p>
-                    
-                    <div class="form-group">
-                        <label for="ai-model">AI Model</label>
-                        <select id="ai-model" name="AI_MODEL">
-                            <option value="">Select a model...</option>
-                        </select>
-                        <small id="ai-model-description">Select the AI model to use</small>
+                    <div class="section-header" onclick="toggleSection('ai-config')">
+                        <h3>AI Configuration</h3>
+                        <span class="section-toggle" id="ai-config-toggle">▼</span>
                     </div>
-                    
-                    <div class="form-group" id="custom-model-group" style="display: none;">
-                        <label for="custom-model">Custom Model Name</label>
-                        <input type="text" id="custom-model" placeholder="Enter custom model name">
-                        <small>Enter the exact model name (e.g., gemini-1.5-pro, gpt-4)</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="ai-delay">API Call Delay (seconds)</label>
-                        <input type="number" id="ai-delay" name="AI_CALL_DELAY_SECONDS" min="0" max="10" step="0.5" placeholder="2">
-                        <small>Delay between API calls to avoid rate limiting (default: 2 seconds)</small>
-                    </div>
-                </div>
-                
-                <div class="settings-section">
-                    <h3>Advanced Options</h3>
-                    
-                    <div class="form-group">
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="web-search" name="ENABLE_WEB_SEARCH">
-                            <label for="web-search">Enable Web Search</label>
+                    <div class="section-content" id="ai-config-content">
+                        <p style="font-size: 14px; margin-bottom: 20px; color: var(--text-secondary);">Jobs are processed one at a time in queue order for optimal reliability.</p>
+                        
+                        <div class="form-group">
+                            <label for="ai-provider">AI Provider</label>
+                            <select id="ai-provider" name="AI_PROVIDER" onchange="handleProviderChange()">
+                                <option value="google">Google AI</option>
+                                <option value="openai">OpenAI</option>
+                            </select>
+                            <small>Select which AI provider to use</small>
                         </div>
-                        <small>Allow AI to search the web for additional context</small>
-                    </div>
-                </div>
-                
-                <div class="settings-section">
-                    <h3>Jellyfin Integration</h3>
-                    
-                    <div class="form-group">
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="jellyfin-refresh" name="JELLYFIN_REFRESH_ENABLED">
-                            <label for="jellyfin-refresh">Refresh Jellyfin when items are completed</label>
+                        
+                        <div class="form-group" id="google-api-key-group">
+                            <label for="google-api-key">Google API Key</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="text" id="google-api-key" name="GOOGLE_API_KEY" placeholder="Enter Google API Key" style="flex: 1;">
+                                <button type="button" id="delete-google-key" class="delete-key-btn" style="display: none;" onclick="deleteApiKey('google')">Delete</button>
+                            </div>
+                            <small>Required for Google AI-powered file organization</small>
                         </div>
-                        <small>Automatically trigger Jellyfin library refresh after organizing files (Server: http://localhost:8096, API key configured above)</small>
+                        
+                        <div class="form-group" id="openai-api-key-group" style="display: none;">
+                            <label for="openai-api-key">OpenAI API Key</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="text" id="openai-api-key" name="OPENAI_API_KEY" placeholder="Enter OpenAI API Key" style="flex: 1;">
+                                <button type="button" id="delete-openai-key" class="delete-key-btn" style="display: none;" onclick="deleteApiKey('openai')">Delete</button>
+                            </div>
+                            <small>Required for OpenAI-powered file organization</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="ai-model">AI Model</label>
+                            <select id="ai-model" name="AI_MODEL">
+                                <option value="">Select a model...</option>
+                            </select>
+                            <small id="ai-model-description">Select the AI model to use</small>
+                        </div>
+                        
+                        <div class="form-group" id="custom-model-group" style="display: none;">
+                            <label for="custom-model">Custom Model Name</label>
+                            <input type="text" id="custom-model" placeholder="Enter custom model name">
+                            <small>Enter the exact model name (e.g., gemini-1.5-pro, gpt-4)</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="web-search" name="ENABLE_WEB_SEARCH">
+                                <label for="web-search">Enable Web Search</label>
+                            </div>
+                            <small>Allow AI to search the web for additional context</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="ai-delay">API Call Delay (seconds)</label>
+                            <input type="number" id="ai-delay" name="AI_CALL_DELAY_SECONDS" min="0" max="10" step="0.5" placeholder="2">
+                            <small>Delay between API calls to avoid rate limiting (default: 2 seconds)</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>AI Instruction Prompt Editor</label>
+                            <button type="button" class="save-btn" onclick="openInstructionEditor()" style="background: #48bb78; width: auto;">
+                                Edit AI Instructions
+                            </button>
+                            <small>Customize the instructions provided to the AI for file organization</small>
+                        </div>
                     </div>
                 </div>
                 
+                <!-- 3. Jellyfin Integration -->
                 <div class="settings-section">
-                    <h3>Security</h3>
-                    
-                    <div class="form-group">
-                        <label for="app-password">Application Password</label>
-                        <input type="password" id="app-password" name="APP_PASSWORD" placeholder="Leave blank for no password">
-                        <small>Require password to access the entire application (leave blank to disable)</small>
+                    <div class="section-header" onclick="toggleSection('jellyfin')">
+                        <h3>Jellyfin Integration</h3>
+                        <span class="section-toggle" id="jellyfin-toggle">▼</span>
                     </div>
-                    
-                    <div class="form-group">
-                        <label for="admin-password">Admin Password</label>
-                        <input type="password" id="admin-password" name="ADMIN_PASSWORD" placeholder="Leave blank for no password">
-                        <small>Require password to access settings page (leave blank to disable)</small>
+                    <div class="section-content" id="jellyfin-content">
+                        <div class="form-group">
+                            <label for="jellyfin-api-key">Jellyfin API Key</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="text" id="jellyfin-api-key" name="JELLYFIN_API_KEY" placeholder="Enter Jellyfin API Key" style="flex: 1;">
+                                <button type="button" id="delete-jellyfin-key" class="delete-key-btn" style="display: none;" onclick="deleteApiKey('jellyfin')">Delete</button>
+                            </div>
+                            <small>Required for automatic Jellyfin library refresh</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="jellyfin-refresh" name="JELLYFIN_REFRESH_ENABLED">
+                                <label for="jellyfin-refresh">Refresh Jellyfin when items are completed</label>
+                            </div>
+                            <small>Automatically trigger Jellyfin library refresh after organizing files (Server: http://localhost:8096)</small>
+                        </div>
                     </div>
                 </div>
                 
+                <!-- 4. Security -->
                 <div class="settings-section">
-                    <h3>AI Instructions</h3>
-                    
-                    <div class="form-group">
-                        <label>Instruction Prompt Editor</label>
-                        <button type="button" class="save-btn" onclick="openInstructionEditor()" style="background: #48bb78; width: auto;">
-                            Edit AI Instructions
-                        </button>
-                        <small>Customize the instructions provided to the AI for file organization</small>
+                    <div class="section-header" onclick="toggleSection('security')">
+                        <h3>Security</h3>
+                        <span class="section-toggle" id="security-toggle">▼</span>
+                    </div>
+                    <div class="section-content" id="security-content">
+                        <div class="form-group">
+                            <label for="app-password">Application Password</label>
+                            <input type="password" id="app-password" name="APP_PASSWORD" placeholder="Leave blank for no password">
+                            <small>Require password to access the entire application (leave blank to disable)</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="admin-password">Admin Password</label>
+                            <input type="password" id="admin-password" name="ADMIN_PASSWORD" placeholder="Leave blank for no password">
+                            <small>Require password to access settings page (leave blank to disable)</small>
+                        </div>
                     </div>
                 </div>
                 
@@ -865,6 +910,40 @@
         initTheme();
         
         let currentConfig = {};
+        let providerModels = {
+            google: null,
+            openai: null
+        };
+        
+        // Section toggle functionality
+        function toggleSection(sectionId) {
+            const content = document.getElementById(sectionId + '-content');
+            const toggle = document.getElementById(sectionId + '-toggle');
+            
+            if (content.classList.contains('collapsed')) {
+                content.classList.remove('collapsed');
+                toggle.classList.remove('collapsed');
+                localStorage.setItem('section-' + sectionId, 'open');
+            } else {
+                content.classList.add('collapsed');
+                toggle.classList.add('collapsed');
+                localStorage.setItem('section-' + sectionId, 'collapsed');
+            }
+        }
+        
+        // Restore section states from localStorage
+        function restoreSectionStates() {
+            const sections = ['folder-paths', 'ai-config', 'jellyfin', 'security'];
+            sections.forEach(sectionId => {
+                const state = localStorage.getItem('section-' + sectionId);
+                if (state === 'collapsed') {
+                    const content = document.getElementById(sectionId + '-content');
+                    const toggle = document.getElementById(sectionId + '-toggle');
+                    content.classList.add('collapsed');
+                    toggle.classList.add('collapsed');
+                }
+            });
+        }
         
         function maskApiKey(key) {
             if (!key || key.length <= 4) return key;
@@ -889,6 +968,18 @@
             const googleKeyGroup = document.getElementById('google-api-key-group');
             const openaiKeyGroup = document.getElementById('openai-api-key-group');
             
+            // Save current model for the current provider before switching
+            const currentProvider = document.getElementById('ai-provider').value;
+            const currentModel = document.getElementById('ai-model').value;
+            const customModel = document.getElementById('custom-model').value;
+            
+            if (currentModel === 'custom' && customModel) {
+                providerModels[currentProvider] = customModel;
+            } else if (currentModel) {
+                providerModels[currentProvider] = currentModel;
+            }
+            
+            // Switch API key display
             if (provider === 'openai') {
                 googleKeyGroup.style.display = 'none';
                 openaiKeyGroup.style.display = 'block';
@@ -928,10 +1019,22 @@
                 document.getElementById('app-password').value = currentConfig.APP_PASSWORD || '';
                 document.getElementById('admin-password').value = currentConfig.ADMIN_PASSWORD || '';
                 
+                // Store provider-specific models
+                providerModels.google = currentConfig.GOOGLE_MODEL || currentConfig.AI_MODEL || 'gemini-2.5-flash';
+                providerModels.openai = currentConfig.OPENAI_MODEL || 'gpt-5-mini';
+                
                 // Handle AI provider
                 const provider = currentConfig.AI_PROVIDER || 'google';
                 document.getElementById('ai-provider').value = provider;
-                handleProviderChange();
+                
+                // Show appropriate API key group
+                if (provider === 'openai') {
+                    document.getElementById('google-api-key-group').style.display = 'none';
+                    document.getElementById('openai-api-key-group').style.display = 'block';
+                } else {
+                    document.getElementById('google-api-key-group').style.display = 'block';
+                    document.getElementById('openai-api-key-group').style.display = 'none';
+                }
                 
                 // Handle API keys with masking
                 const googleKey = currentConfig.GOOGLE_API_KEY || '';
@@ -957,6 +1060,7 @@
                 }
                 
                 await loadModels();
+                restoreSectionStates();
             } catch (error) {
                 console.error('Error loading config:', error);
                 showAlert('Error loading configuration', 'error');
@@ -1014,18 +1118,21 @@
                             modelSelect.appendChild(option);
                         });
                         
-                        // Set current model
-                        if (currentConfig.AI_MODEL) {
-                            // Check if it's a custom model
-                            const standardModels = models.filter(m => m !== 'custom');
-                            if (standardModels.includes(currentConfig.AI_MODEL)) {
-                                modelSelect.value = currentConfig.AI_MODEL;
-                            } else if (currentConfig.AI_MODEL) {
-                                // It's a custom model
-                                modelSelect.value = 'custom';
-                                document.getElementById('custom-model').value = currentConfig.AI_MODEL;
-                                handleModelChange();
-                            }
+                        // Restore provider-specific model
+                        const savedModel = providerModels[provider];
+                        const standardModels = models.filter(m => m !== 'custom');
+                        
+                        if (savedModel && standardModels.includes(savedModel)) {
+                            modelSelect.value = savedModel;
+                        } else if (savedModel && !standardModels.includes(savedModel)) {
+                            // It's a custom model
+                            modelSelect.value = 'custom';
+                            document.getElementById('custom-model').value = savedModel;
+                            handleModelChange();
+                        } else {
+                            // Default to recommended model
+                            const recommendedModel = provider === 'google' ? 'gemini-2.5-flash' : 'gpt-5-mini';
+                            modelSelect.value = recommendedModel;
                         }
                     }
                 } else {
@@ -1090,6 +1197,14 @@
                         }
                     } else {
                         config[key] = value;
+                    }
+                    
+                    // Save provider-specific model
+                    const provider = document.getElementById('ai-provider').value;
+                    if (provider === 'google') {
+                        config['GOOGLE_MODEL'] = config[key];
+                    } else if (provider === 'openai') {
+                        config['OPENAI_MODEL'] = config[key];
                     }
                 } else {
                     config[key] = value;
