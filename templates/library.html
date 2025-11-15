@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Browser - Intelly Jelly</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        h1 {
+            color: #667eea;
+            font-size: 28px;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .nav-links a {
+            color: #667eea;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        
+        .nav-links a:hover {
+            background: #f0f0f0;
+        }
+        
+        .stats {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .library-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .library-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .library-header h2 {
+            color: #333;
+        }
+        
+        .search-box {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .search-box input {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            width: 300px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: opacity 0.3s;
+        }
+        
+        .btn:hover {
+            opacity: 0.8;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #ddd;
+            color: #333;
+        }
+        
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        
+        .btn-edit {
+            background: #74b9ff;
+            color: white;
+        }
+        
+        .btn-reai {
+            background: #a29bfe;
+            color: white;
+        }
+        
+        .files-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        
+        .files-table th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #dee2e6;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .files-table th:hover {
+            background: #e9ecef;
+        }
+        
+        .files-table td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 13px;
+        }
+        
+        .files-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .file-icon {
+            margin-right: 5px;
+        }
+        
+        .path-text {
+            word-break: break-all;
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .file-size {
+            white-space: nowrap;
+        }
+        
+        .subtitle-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            background: #a29bfe;
+            color: white;
+            margin-left: 5px;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .pagination button {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .pagination button:hover:not(:disabled) {
+            background: #f0f0f0;
+        }
+        
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .pagination .page-info {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 550px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-header h3 {
+            color: #333;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            margin-top: 8px;
+        }
+        
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            font-weight: 400;
+            color: #555;
+        }
+        
+        .checkbox-label input[type="checkbox"] {
+            width: auto;
+            cursor: pointer;
+            margin: 0;
+        }
+        
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        
+        .info-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .pending-renames {
+            background: #fff9e6;
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .pending-renames.active {
+            display: block;
+        }
+        
+        .pending-renames h3 {
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .pending-item {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            border-left: 4px solid #a29bfe;
+        }
+        
+        .pending-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .pending-item .file-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .pending-item .status {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+        }
+        
+        .loading-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .loading-content .spinner {
+            width: 40px;
+            height: 40px;
+            border-width: 4px;
+            margin-bottom: 15px;
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            header {
+                padding: 15px;
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            h1 {
+                font-size: 22px;
+            }
+            
+            .nav-links {
+                width: 100%;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            
+            .stats {
+                padding: 15px;
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .library-container {
+                padding: 15px;
+                overflow-x: auto;
+            }
+            
+            .search-box input {
+                width: 200px;
+            }
+            
+            .files-table {
+                font-size: 11px;
+                min-width: 700px;
+            }
+            
+            .actions {
+                flex-direction: column;
+                gap: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🍇 Intelly Jelly - Library</h1>
+            <div class="nav-links">
+                <a href="/">Downloads</a>
+                <a href="/library">Library</a>
+                <a href="/settings">Settings</a>
+                <a href="/logs">Logs</a>
+            </div>
+        </header>
+        
+        <div class="stats" id="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="stat-total">0</div>
+                <div class="stat-label">Total Files</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-videos">0</div>
+                <div class="stat-label">Video Files</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-subtitles">0</div>
+                <div class="stat-label">Subtitle Files</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-size">0 MB</div>
+                <div class="stat-label">Total Size</div>
+            </div>
+        </div>
+        
+        <div class="pending-renames" id="pending-renames">
+            <h3>
+                <span class="spinner"></span>
+                AI Processing Queue
+            </h3>
+            <div id="pending-list"></div>
+        </div>
+        
+        <div class="library-container">
+            <div class="library-header">
+                <h2>Library Files</h2>
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="Search files...">
+                    <button class="btn btn-primary" onclick="searchFiles()">Search</button>
+                    <button class="btn btn-secondary" onclick="clearSearch()">Clear</button>
+                </div>
+            </div>
+            
+            <div id="files-list"></div>
+            
+            <div class="pagination" id="pagination"></div>
+        </div>
+        
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loading-overlay">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p>Processing with AI...</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Rename Modal -->
+    <div class="modal" id="rename-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Rename File</h3>
+                <button class="close-btn" onclick="closeRenameModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>Current Name</label>
+                <input type="text" id="current-name" readonly style="background: #f5f5f5;">
+            </div>
+            <div class="form-group">
+                <label>New Name or Path</label>
+                <input type="text" id="new-name" placeholder="Enter new file name or path (e.g., 'newname' or 'folder/newname')">
+                <div class="info-text">Extension will be preserved automatically. Use folder/filename to move to a different directory.</div>
+            </div>
+            <div class="form-group" id="subtitle-option" style="display:none;">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="rename-subtitle" checked>
+                    <span>Also rename/move matching subtitle file</span>
+                </label>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="closeRenameModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveRename()">Rename</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Re-AI Modal -->
+    <div class="modal" id="reai-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Re-AI File Name</h3>
+                <button class="close-btn" onclick="closeReAIModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>Current Name</label>
+                <input type="text" id="reai-current-name" readonly style="background: #f5f5f5;">
+            </div>
+            <div class="form-group">
+                <label>Custom Prompt (optional)</label>
+                <textarea id="reai-prompt" placeholder="Enter custom instructions for the AI..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>AI Processing Options</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="reai-include-instructions" checked>
+                        <span>Include instructions</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="reai-include-filename" checked>
+                        <span>Include original filename</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="reai-web-search">
+                        <span>Enable web search</span>
+                    </label>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="closeReAIModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="processReAI()">Generate</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentPage = 1;
+        let currentSearch = '';
+        let currentSort = 'modified';
+        let currentSortOrder = 'desc';
+        let currentFilePath = null;
+        let currentHasSubtitle = false;
+        let currentDir = '';
+        let pendingRenames = [];
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        function formatDate(timestamp) {
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleString();
+        }
+        
+        function getFileIcon(extension, isVideo) {
+            if (isVideo) return '🎬';
+            if (extension === '.srt' || extension === '.sub') return '📝';
+            if (extension === '.mp3' || extension === '.flac') return '🎵';
+            if (extension === '.pdf' || extension === '.epub') return '📚';
+            return '📄';
+        }
+        
+        async function loadFiles() {
+            try {
+                const response = await fetch(`/api/library/files?page=${currentPage}&search=${encodeURIComponent(currentSearch)}&sort_by=${currentSort}&sort_order=${currentSortOrder}&dir=${encodeURIComponent(currentDir)}`);
+                const data = await response.json();
+                
+                updateStats(data.stats);
+                displayFiles(data.items, data.has_parent, data.parent_dir, data.current_dir);
+                displayPagination(data.pagination);
+                updatePendingRenames();
+            } catch (error) {
+                console.error('Error loading files:', error);
+            }
+        }
+        
+        function updatePendingRenames() {
+            const pendingDiv = document.getElementById('pending-renames');
+            const pendingList = document.getElementById('pending-list');
+            
+            if (pendingRenames.length === 0) {
+                pendingDiv.classList.remove('active');
+                return;
+            }
+            
+            pendingDiv.classList.add('active');
+            
+            let html = '';
+            pendingRenames.forEach(item => {
+                const confidenceText = item.confidence ? ` (Confidence: ${item.confidence}%)` : '';
+                html += `
+                    <div class="pending-item">
+                        <div class="file-name">${item.filename}</div>
+                        <div class="status">${item.status}${confidenceText}</div>
+                    </div>
+                `;
+            });
+            
+            pendingList.innerHTML = html;
+        }
+        
+        function addToPending(filename, status, confidence = null) {
+            pendingRenames.push({ filename, status, confidence });
+            updatePendingRenames();
+        }
+        
+        function removeFromPending(filename) {
+            pendingRenames = pendingRenames.filter(item => item.filename !== filename);
+            updatePendingRenames();
+        }
+        
+        function updatePendingStatus(filename, status, confidence = null) {
+            const item = pendingRenames.find(item => item.filename === filename);
+            if (item) {
+                item.status = status;
+                if (confidence !== null) {
+                    item.confidence = confidence;
+                }
+                updatePendingRenames();
+            }
+        }
+        
+        function updateStats(stats) {
+            document.getElementById('stat-total').textContent = stats.total_files || 0;
+            document.getElementById('stat-videos').textContent = stats.video_files || 0;
+            document.getElementById('stat-subtitles').textContent = stats.subtitle_files || 0;
+            document.getElementById('stat-size').textContent = formatFileSize(stats.total_size || 0);
+        }
+        
+        function displayFiles(items, hasParent, parentDir, currentDirectory) {
+            const filesList = document.getElementById('files-list');
+            
+            if (items.length === 0 && !hasParent) {
+                filesList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📁</div>
+                        <p>No files found in library.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = `
+                <table class="files-table">
+                    <thead>
+                        <tr>
+                            <th onclick="sortBy('filename')">Name ${currentSort === 'filename' ? (currentSortOrder === 'asc' ? '↑' : '↓') : ''}</th>
+                            <th>Path</th>
+                            <th onclick="sortBy('size')">Size ${currentSort === 'size' ? (currentSortOrder === 'asc' ? '↑' : '↓') : ''}</th>
+                            <th onclick="sortBy('modified')">Modified ${currentSort === 'modified' ? (currentSortOrder === 'asc' ? '↑' : '↓') : ''}</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            // Add parent directory row if not at root
+            if (hasParent) {
+                html += `
+                    <tr style="background: #f8f9fa;">
+                        <td colspan="5" style="cursor: pointer;" onclick="navigateToDir('${parentDir || ''}')">
+                            <span class="file-icon">📁</span>
+                            <strong>.. (Go Back)</strong>
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            // Display folders and files
+            items.forEach(item => {
+                if (item.is_folder) {
+                    // It's a folder
+                    html += `
+                        <tr style="cursor: pointer; background: #fafbfc;" onclick="navigateToDir('${item.relative_path}')">
+                            <td>
+                                <span class="file-icon">📁</span>
+                                <strong>${item.name}</strong>
+                            </td>
+                            <td class="path-text">${item.relative_path}</td>
+                            <td class="file-size">${item.file_count} files</td>
+                            <td>-</td>
+                            <td>-</td>
+                        </tr>
+                    `;
+                } else {
+                    // It's a file
+                    const icon = getFileIcon(item.extension, item.is_video);
+                    const subtitleBadge = item.is_video && item.has_subtitle ? '<span class="subtitle-badge">SUB</span>' : '';
+                    
+                    html += `
+                        <tr>
+                            <td>
+                                <span class="file-icon">${icon}</span>
+                                ${item.filename}${subtitleBadge}
+                            </td>
+                            <td class="path-text">${currentDirectory || '/'}</td>
+                            <td class="file-size">${formatFileSize(item.size)}</td>
+                            <td>${formatDate(item.modified)}</td>
+                            <td>
+                                <div class="actions">
+                                    <button class="btn btn-small btn-edit" onclick='openRenameModal(${JSON.stringify(item)})'>Rename</button>
+                                    <button class="btn btn-small btn-reai" onclick='openReAIModal(${JSON.stringify(item)})'>Re-AI</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }
+            });
+            
+            html += `
+                    </tbody>
+                </table>
+            `;
+            
+            filesList.innerHTML = html;
+        }
+        
+        function navigateToDir(dir) {
+            currentDir = dir;
+            currentPage = 1;
+            loadFiles();
+        }
+        
+        function displayPagination(pagination) {
+            const paginationDiv = document.getElementById('pagination');
+            
+            if (pagination.total_pages <= 1) {
+                paginationDiv.innerHTML = '';
+                return;
+            }
+            
+            let html = `
+                <button ${!pagination.has_previous ? 'disabled' : ''} onclick="changePage(${pagination.current_page - 1})">Previous</button>
+                <span class="page-info">Page ${pagination.current_page} of ${pagination.total_pages} (${pagination.total_files} files)</span>
+                <button ${!pagination.has_next ? 'disabled' : ''} onclick="changePage(${pagination.current_page + 1})">Next</button>
+            `;
+            
+            paginationDiv.innerHTML = html;
+        }
+        
+        function changePage(page) {
+            currentPage = page;
+            loadFiles();
+        }
+        
+        function sortBy(field) {
+            if (currentSort === field) {
+                currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort = field;
+                currentSortOrder = 'desc';
+            }
+            loadFiles();
+        }
+        
+        function searchFiles() {
+            currentSearch = document.getElementById('search-input').value;
+            currentPage = 1;
+            currentDir = ''; // Search globally, reset to root
+            loadFiles();
+        }
+        
+        function clearSearch() {
+            currentSearch = '';
+            document.getElementById('search-input').value = '';
+            currentPage = 1;
+            loadFiles();
+        }
+        
+        document.getElementById('search-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchFiles();
+            }
+        });
+        
+        function openRenameModal(file) {
+            currentFilePath = file.full_path;
+            currentHasSubtitle = file.is_video && file.has_subtitle;
+            
+            document.getElementById('current-name').value = file.filename;
+            document.getElementById('new-name').value = file.filename;
+            
+            // Show subtitle option only for videos with subtitles
+            if (currentHasSubtitle) {
+                document.getElementById('subtitle-option').style.display = 'block';
+            } else {
+                document.getElementById('subtitle-option').style.display = 'none';
+            }
+            
+            document.getElementById('rename-modal').classList.add('active');
+        }
+        
+        function closeRenameModal() {
+            const currentName = document.getElementById('current-name').value;
+            
+            // If closing without saving, remove from pending queue
+            removeFromPending(currentName);
+            
+            document.getElementById('rename-modal').classList.remove('active');
+            // Reset the file path after closing
+            currentFilePath = null;
+            currentHasSubtitle = false;
+        }
+        
+        async function saveRename() {
+            const currentName = document.getElementById('current-name').value;
+            const newName = document.getElementById('new-name').value.trim();
+            const renameSubtitle = document.getElementById('rename-subtitle').checked;
+            
+            if (!newName) {
+                alert('Please enter a new name');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/library/rename', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        file_path: currentFilePath,
+                        new_name: newName,
+                        rename_subtitle: renameSubtitle
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Remove from pending queue
+                    removeFromPending(currentName);
+                    
+                    closeRenameModal();
+                    loadFiles();
+                    alert(result.message);
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error renaming file:', error);
+                alert('Error renaming file: ' + error.message);
+            }
+        }
+        
+        function openReAIModal(file) {
+            console.log('Opening Re-AI modal for file:', file);
+            currentFilePath = file.full_path;
+            currentHasSubtitle = file.is_video && (file.has_subtitle || false);
+            document.getElementById('reai-current-name').value = file.filename;
+            document.getElementById('reai-prompt').value = '';
+            document.getElementById('reai-modal').classList.add('active');
+            console.log('currentFilePath set to:', currentFilePath);
+        }
+        
+        function closeReAIModal() {
+            document.getElementById('reai-modal').classList.remove('active');
+            // Don't reset currentFilePath here - we need it for processing
+        }
+        
+        async function processReAI() {
+            console.log('processReAI called, currentFilePath:', currentFilePath);
+            
+            if (!currentFilePath) {
+                alert('Error: No file selected for AI processing');
+                return;
+            }
+            
+            let customPrompt = document.getElementById('reai-prompt').value;
+            const includeInstructions = document.getElementById('reai-include-instructions').checked;
+            const includeFilename = document.getElementById('reai-include-filename').checked;
+            const enableWebSearch = document.getElementById('reai-web-search').checked;
+            
+            // Get the current filename for tracking
+            const currentFilename = document.getElementById('reai-current-name').value;
+            
+            // If instructions are not included but custom prompt is provided,
+            // append JSON formatting instructions
+            if (!includeInstructions && customPrompt) {
+                const jsonInstructions = '\n\nIMPORTANT: Return your response as a JSON array with the following structure:\n' +
+                    '[{\n' +
+                    '  "original_path": "original filename",\n' +
+                    '  "suggested_name": "your suggested name",\n' +
+                    '  "confidence": 0-100\n' +
+                    '}]';
+                customPrompt = customPrompt + jsonInstructions;
+            }
+            
+            // Close modal and show loading
+            closeReAIModal();
+            document.getElementById('loading-overlay').classList.add('active');
+            
+            // Add to pending queue
+            addToPending(currentFilename, 'Processing with AI...');
+            
+            try {
+                console.log('Sending request with file_path:', currentFilePath);
+                const requestBody = {
+                    file_path: currentFilePath,
+                    custom_prompt: customPrompt || null,
+                    include_instructions: includeInstructions,
+                    include_filename: includeFilename,
+                    enable_web_search: enableWebSearch
+                };
+                console.log('Request body:', requestBody);
+                
+                const response = await fetch('/api/library/re-ai', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                // Hide loading overlay
+                document.getElementById('loading-overlay').classList.remove('active');
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    updatePendingStatus(currentFilename, 'AI processing complete - ready to rename', result.confidence);
+                    
+                    // Clean up the suggested name to extract just the filename
+                    let suggestedName = result.suggested_name;
+                    
+                    // Check if AI returned a full path (contains / or \)
+                    if (suggestedName.includes('/') || suggestedName.includes('\\')) {
+                        // Extract just the filename from the path
+                        suggestedName = suggestedName.split('/').pop().split('\\').pop();
+                        console.log('AI returned full path, extracted filename:', suggestedName);
+                    }
+                    
+                    // Open rename modal with suggested name
+                    // currentFilePath and currentHasSubtitle are already set from openReAIModal
+                    document.getElementById('current-name').value = currentFilename;
+                    document.getElementById('new-name').value = suggestedName;
+                    
+                    if (currentHasSubtitle) {
+                        document.getElementById('subtitle-option').style.display = 'block';
+                    } else {
+                        document.getElementById('subtitle-option').style.display = 'none';
+                    }
+                    
+                    document.getElementById('rename-modal').classList.add('active');
+                } else {
+                    removeFromPending(currentFilename);
+                    alert('Error: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                document.getElementById('loading-overlay').classList.remove('active');
+                removeFromPending(currentFilename);
+                console.error('Error processing with AI:', error);
+                alert('Error processing with AI: ' + error.message);
+            }
+        }
+        
+        // Load files on page load
+        loadFiles();
+        
+        // Auto-refresh every 10 seconds
+        setInterval(() => {
+            loadFiles();
+        }, 10000);
+    </script>
+</body>
+</html>

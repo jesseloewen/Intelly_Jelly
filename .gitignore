@@ -23,6 +23,7 @@ config.json
 *.egg-info/
 .installed.cfg
 *.egg
+file_movements.json
 
 # Environment variables
 .env
