@@ -240,10 +240,11 @@ class LibraryBrowser:
     def rename_file(self, old_path: str, new_name: str, rename_subtitle: bool = True) -> Dict:
         """
         Rename a file and optionally its related subtitle.
+        Supports both simple renames and moving to different directories.
         
         Args:
             old_path: Full path to the file to rename
-            new_name: New filename (without path)
+            new_name: New filename or relative path (e.g., "newname.ext" or "subfolder/newname.ext")
             rename_subtitle: If True and file is video, rename matching subtitle too
             
         Returns:
@@ -264,17 +265,36 @@ class LibraryBrowser:
             old_filename = os.path.basename(old_path)
             old_ext = os.path.splitext(old_filename)[1]
             
-            # Ensure new name has the same extension
-            new_base = os.path.splitext(new_name)[0]
-            new_filename = new_base + old_ext
-            new_path = os.path.join(old_dir, new_filename)
+            # Check if new_name contains directory separators (indicates a path)
+            if '/' in new_name or '\\' in new_name:
+                # new_name is a relative path from library root
+                # Normalize path separators
+                new_name_normalized = new_name.replace('\\', '/')
+                
+                # Build full path from library root
+                new_path = os.path.join(self.library_path, new_name_normalized)
+                
+                # Ensure extension is preserved
+                new_base = os.path.splitext(new_path)[0]
+                new_path = new_base + old_ext
+                new_dir = os.path.dirname(new_path)
+                new_filename = os.path.basename(new_path)
+            else:
+                # Simple filename rename in same directory
+                new_base = os.path.splitext(new_name)[0]
+                new_filename = new_base + old_ext
+                new_path = os.path.join(old_dir, new_filename)
+                new_dir = old_dir
             
             # Check if destination already exists
             if os.path.exists(new_path) and new_path != old_path:
                 result['message'] = f"Destination file already exists: {new_filename}"
                 return result
             
-            # Rename the main file
+            # Create destination directory if it doesn't exist
+            os.makedirs(new_dir, exist_ok=True)
+            
+            # Rename/move the main file
             os.rename(old_path, new_path)
             result['renamed_files'].append({
                 'old': old_path,
@@ -288,7 +308,9 @@ class LibraryBrowser:
                 subtitle_path = self.find_related_subtitle(old_path)
                 if subtitle_path:
                     subtitle_ext = os.path.splitext(subtitle_path)[1]
-                    new_subtitle_path = os.path.join(old_dir, new_base + subtitle_ext)
+                    # Get base name from new path (without extension)
+                    new_base_name = os.path.splitext(os.path.basename(new_path))[0]
+                    new_subtitle_path = os.path.join(new_dir, new_base_name + subtitle_ext)
                     
                     try:
                         os.rename(subtitle_path, new_subtitle_path)

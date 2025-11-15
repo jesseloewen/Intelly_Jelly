@@ -579,14 +579,14 @@
                 <input type="text" id="current-name" readonly style="background: #f5f5f5;">
             </div>
             <div class="form-group">
-                <label>New Name</label>
-                <input type="text" id="new-name" placeholder="Enter new file name">
-                <div class="info-text">Extension will be preserved automatically</div>
+                <label>New Name or Path</label>
+                <input type="text" id="new-name" placeholder="Enter new file name or path (e.g., 'newname' or 'folder/newname')">
+                <div class="info-text">Extension will be preserved automatically. Use folder/filename to move to a different directory.</div>
             </div>
             <div class="form-group" id="subtitle-option" style="display:none;">
                 <label class="checkbox-label">
                     <input type="checkbox" id="rename-subtitle" checked>
-                    <span>Also rename matching subtitle file</span>
+                    <span>Also rename/move matching subtitle file</span>
                 </label>
             </div>
             <div class="form-actions">
@@ -1026,10 +1026,20 @@
                 if (result.success) {
                     updatePendingStatus(currentFilename, 'AI processing complete - ready to rename', result.confidence);
                     
+                    // Clean up the suggested name to extract just the filename
+                    let suggestedName = result.suggested_name;
+                    
+                    // Check if AI returned a full path (contains / or \)
+                    if (suggestedName.includes('/') || suggestedName.includes('\\')) {
+                        // Extract just the filename from the path
+                        suggestedName = suggestedName.split('/').pop().split('\\').pop();
+                        console.log('AI returned full path, extracted filename:', suggestedName);
+                    }
+                    
                     // Open rename modal with suggested name
                     // currentFilePath and currentHasSubtitle are already set from openReAIModal
                     document.getElementById('current-name').value = currentFilename;
-                    document.getElementById('new-name').value = result.suggested_name;
+                    document.getElementById('new-name').value = suggestedName;
                     
                     if (currentHasSubtitle) {
                         document.getElementById('subtitle-option').style.display = 'block';
