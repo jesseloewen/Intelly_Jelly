@@ -16,6 +16,7 @@ from backend.file_watcher import (
     DownloadingFolderHandler, 
     CompletedFolderHandler
 )
+from backend.file_movement_logger import FileMovementLogger
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class BackendOrchestrator:
         self.config_manager = config_manager
         self.job_store = job_store
         self.ai_processor = AIProcessor(config_manager)
+        self.file_movement_logger = FileMovementLogger()
         
         self.downloading_watcher: Optional[FileWatcher] = None
         self.completed_watcher: Optional[FileWatcher] = None
@@ -409,9 +411,23 @@ class BackendOrchestrator:
             
             if dry_run:
                 logger.info(f"DRY RUN: Would move {file_path} -> {destination_file}")
+                # Log the dry run movement
+                self.file_movement_logger.log_movement(
+                    source_path=file_path,
+                    destination_path=destination_file,
+                    job_id=job.job_id,
+                    status='dry_run'
+                )
             else:
                 shutil.move(file_path, destination_file)
                 logger.info(f"Successfully moved file: {file_path} -> {destination_file}")
+                # Log the successful movement
+                self.file_movement_logger.log_movement(
+                    source_path=file_path,
+                    destination_path=destination_file,
+                    job_id=job.job_id,
+                    status='success'
+                )
             
             self.job_store.update_job(
                 job.job_id,
@@ -445,6 +461,14 @@ class BackendOrchestrator:
         
         except Exception as e:
             logger.error(f"Error organizing file for job {job.job_id}: {type(e).__name__}: {e}", exc_info=True)
+            # Log the failed movement
+            self.file_movement_logger.log_movement(
+                source_path=file_path,
+                destination_path=destination_file if 'destination_file' in locals() else 'unknown',
+                job_id=job.job_id,
+                status='failed',
+                error_message=str(e)
+            )
             self.job_store.update_job(
                 job.job_id,
                 JobStatus.FAILED,

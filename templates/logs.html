@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movement Logs - Intelly Jelly</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        h1 {
+            color: #667eea;
+            font-size: 28px;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .nav-links a {
+            color: #667eea;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        
+        .nav-links a:hover {
+            background: #f0f0f0;
+        }
+        
+        .stats {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .logs-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .logs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .logs-header h2 {
+            color: #333;
+        }
+        
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        
+        .refresh-btn:hover {
+            background: #5568d3;
+        }
+        
+        .logs-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .logs-table th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .logs-table td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 13px;
+        }
+        
+        .logs-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-success { background: #55efc4; color: #00b894; }
+        .status-failed { background: #ff7675; color: #d63031; }
+        .status-dry_run { background: #a29bfe; color: #6c5ce7; }
+        
+        .path-text {
+            word-break: break-all;
+            max-width: 400px;
+        }
+        
+        .timestamp {
+            white-space: nowrap;
+            color: #666;
+        }
+        
+        .error-message {
+            color: #c53030;
+            font-size: 12px;
+            font-style: italic;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            header {
+                padding: 15px;
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            h1 {
+                font-size: 22px;
+            }
+            
+            .nav-links {
+                width: 100%;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            
+            .stats {
+                padding: 15px;
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .logs-container {
+                padding: 15px;
+                overflow-x: auto;
+            }
+            
+            .logs-table {
+                font-size: 11px;
+                min-width: 700px;
+            }
+            
+            .path-text {
+                max-width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🍇 Intelly Jelly - Movement Logs</h1>
+            <div class="nav-links">
+                <a href="/">Dashboard</a>
+                <a href="/settings">Settings</a>
+                <a href="/logs">Logs</a>
+            </div>
+        </header>
+        
+        <div class="stats" id="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="stat-total">0</div>
+                <div class="stat-label">Total Movements</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-success">0</div>
+                <div class="stat-label">Successful</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-failed">0</div>
+                <div class="stat-label">Failed</div>
+            </div>
+        </div>
+        
+        <div class="logs-container">
+            <div class="logs-header">
+                <h2>File Movement History</h2>
+                <button class="refresh-btn" onclick="loadLogs()">Refresh</button>
+            </div>
+            
+            <div id="logs-list"></div>
+        </div>
+    </div>
+    
+    <script>
+        function getStatusClass(status) {
+            return `status-${status}`;
+        }
+        
+        function formatTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleString();
+        }
+        
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/movement-logs/stats');
+                const stats = await response.json();
+                
+                document.getElementById('stat-total').textContent = stats.total_movements || 0;
+                document.getElementById('stat-success').textContent = stats.successful_movements || 0;
+                document.getElementById('stat-failed').textContent = stats.failed_movements || 0;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+        
+        async function loadLogs() {
+            try {
+                const response = await fetch('/api/movement-logs');
+                const logs = await response.json();
+                
+                const logsList = document.getElementById('logs-list');
+                
+                if (logs.length === 0) {
+                    logsList.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📋</div>
+                            <p>No file movements logged yet.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let html = `
+                    <table class="logs-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Source Path</th>
+                                <th>Source File</th>
+                                <th>Destination Path</th>
+                                <th>Destination File</th>
+                                <th>Status</th>
+                                <th>Job ID</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                logs.forEach(log => {
+                    const errorRow = log.error_message ? `
+                        <tr>
+                            <td colspan="7" class="error-message">
+                                Error: ${log.error_message}
+                            </td>
+                        </tr>
+                    ` : '';
+                    
+                    html += `
+                        <tr>
+                            <td class="timestamp">${formatTimestamp(log.timestamp)}</td>
+                            <td class="path-text">${log.source_path || '-'}</td>
+                            <td>${log.source_filename || '-'}</td>
+                            <td class="path-text">${log.destination_path || '-'}</td>
+                            <td>${log.destination_filename || '-'}</td>
+                            <td><span class="status-badge ${getStatusClass(log.status)}">${log.status}</span></td>
+                            <td style="font-family: monospace; font-size: 11px;">${log.job_id ? log.job_id.substring(0, 8) + '...' : '-'}</td>
+                        </tr>
+                        ${errorRow}
+                    `;
+                });
+                
+                html += `
+                        </tbody>
+                    </table>
+                `;
+                
+                logsList.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading logs:', error);
+            }
+        }
+        
+        // Load on page load
+        loadLogs();
+        loadStats();
+        
+        // Auto-refresh every 5 seconds
+        setInterval(() => {
+            loadLogs();
+            loadStats();
+        }, 5000);
+    </script>
+</body>
+</html>

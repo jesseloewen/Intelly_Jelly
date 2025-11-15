@@ -43,6 +43,11 @@ def settings():
     return render_template('settings.html')
 
 
+@app.route('/logs')
+def logs():
+    return render_template('logs.html')
+
+
 @app.route('/api/jobs', methods=['GET'])
 def get_jobs():
     jobs = job_store.get_all_jobs()
@@ -190,6 +195,27 @@ def get_stats():
     }
     
     return jsonify(stats)
+
+
+@app.route('/api/movement-logs', methods=['GET'])
+def get_movement_logs():
+    try:
+        limit = request.args.get('limit', type=int)
+        movements = orchestrator.file_movement_logger.get_all_movements(limit=limit)
+        return jsonify(movements)
+    except Exception as e:
+        logger.error(f"Error retrieving movement logs: {type(e).__name__}: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to retrieve movement logs'}), 500
+
+
+@app.route('/api/movement-logs/stats', methods=['GET'])
+def get_movement_stats():
+    try:
+        stats = orchestrator.file_movement_logger.get_stats()
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"Error retrieving movement stats: {type(e).__name__}: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to retrieve movement stats'}), 500
 
 
 if __name__ == '__main__':
