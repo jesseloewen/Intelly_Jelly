@@ -744,6 +744,7 @@
                             <select id="ai-provider" name="AI_PROVIDER" onchange="handleProviderChange()">
                                 <option value="google">Google AI (recommended)</option>
                                 <option value="openai">OpenAI</option>
+                                <option value="ollama">Ollama (local)</option>
                             </select>
                             <small>Select which AI provider to use</small>
                         </div>
@@ -768,6 +769,44 @@
                             <small>Required for OpenAI-powered file organization</small>
                         </div>
                         
+                        <div class="form-group" id="ollama-base-url-group" style="display: none;">
+                            <label for="ollama-base-url">Ollama Base URL</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="text" id="ollama-base-url" name="OLLAMA_BASE_URL" placeholder="http://localhost:11434" style="flex: 1;">
+                                <button type="button" class="save-btn" id="refresh-ollama-models-btn" onclick="refreshOllamaModels()" style="background: #667eea; width: auto; padding: 8px 16px;">
+                                    Refresh Models
+                                </button>
+                            </div>
+                            <small>URL of your local Ollama server (default: http://localhost:11434)</small>
+                        </div>
+                        
+                        <div class="form-group" id="ollama-params-group" style="display: none;">
+                            <label>Ollama Parameters</label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                <div>
+                                    <label for="ollama-temperature" style="font-size: 13px; font-weight: normal;">Temperature</label>
+                                    <input type="number" id="ollama-temperature" name="OLLAMA_TEMPERATURE" min="0" max="2" step="0.1" placeholder="0.1">
+                                    <small style="font-size: 11px;">Creativity level (0-2, default: 0.1)</small>
+                                </div>
+                                <div>
+                                    <label for="ollama-num-predict" style="font-size: 13px; font-weight: normal;">Max Tokens</label>
+                                    <input type="number" id="ollama-num-predict" name="OLLAMA_NUM_PREDICT" min="128" max="8192" step="128" placeholder="2048">
+                                    <small style="font-size: 11px;">Maximum response length (default: 2048)</small>
+                                </div>
+                                <div>
+                                    <label for="ollama-top-k" style="font-size: 13px; font-weight: normal;">Top K</label>
+                                    <input type="number" id="ollama-top-k" name="OLLAMA_TOP_K" min="1" max="100" step="1" placeholder="40">
+                                    <small style="font-size: 11px;">Sampling parameter (default: 40)</small>
+                                </div>
+                                <div>
+                                    <label for="ollama-top-p" style="font-size: 13px; font-weight: normal;">Top P</label>
+                                    <input type="number" id="ollama-top-p" name="OLLAMA_TOP_P" min="0" max="1" step="0.05" placeholder="0.9">
+                                    <small style="font-size: 11px;">Nucleus sampling (default: 0.9)</small>
+                                </div>
+                            </div>
+                            <small style="margin-top: 10px; display: block;">Advanced model parameters for fine-tuning Ollama responses</small>
+                        </div>
+                        
                         <div class="form-group">
                             <label for="ai-model">AI Model</label>
                             <select id="ai-model" name="AI_MODEL">
@@ -787,7 +826,7 @@
                                 <input type="checkbox" id="web-search" name="ENABLE_WEB_SEARCH">
                                 <label for="web-search">Enable Web Search</label>
                             </div>
-                            <small>Allow AI to search the web for additional context</small>
+                            <small id="web-search-description">Allow AI to search the web for additional context (Google AI & OpenAI only)</small>
                         </div>
                         
                         <div class="form-group">
@@ -1015,14 +1054,45 @@
             const provider = document.getElementById('ai-provider').value;
             const googleKeyGroup = document.getElementById('google-api-key-group');
             const openaiKeyGroup = document.getElementById('openai-api-key-group');
+            const ollamaBaseUrlGroup = document.getElementById('ollama-base-url-group');
+            const ollamaParamsGroup = document.getElementById('ollama-params-group');
+            const webSearchCheckbox = document.getElementById('web-search');
+            const webSearchLabel = document.querySelector('label[for="web-search"]');
+            const webSearchDescription = document.getElementById('web-search-description');
             
-            // Switch API key display
+            // Switch API key/URL display based on provider
             if (provider === 'openai') {
                 googleKeyGroup.style.display = 'none';
                 openaiKeyGroup.style.display = 'block';
+                ollamaBaseUrlGroup.style.display = 'none';
+                ollamaParamsGroup.style.display = 'none';
+                // Enable web search for OpenAI
+                webSearchCheckbox.disabled = false;
+                webSearchLabel.style.opacity = '1';
+                webSearchLabel.style.cursor = 'pointer';
+            } else if (provider === 'ollama') {
+                googleKeyGroup.style.display = 'none';
+                openaiKeyGroup.style.display = 'none';
+                ollamaBaseUrlGroup.style.display = 'block';
+                ollamaParamsGroup.style.display = 'block';
+                // Disable web search for Ollama
+                webSearchCheckbox.disabled = true;
+                webSearchCheckbox.checked = false;
+                webSearchLabel.style.opacity = '0.5';
+                webSearchLabel.style.cursor = 'not-allowed';
+                webSearchDescription.innerHTML = 'Web search is not supported with Ollama (local models only)';
+                webSearchDescription.style.color = '#999';
             } else {
                 googleKeyGroup.style.display = 'block';
                 openaiKeyGroup.style.display = 'none';
+                ollamaBaseUrlGroup.style.display = 'none';
+                ollamaParamsGroup.style.display = 'none';
+                // Enable web search for Google AI
+                webSearchCheckbox.disabled = false;
+                webSearchLabel.style.opacity = '1';
+                webSearchLabel.style.cursor = 'pointer';
+                webSearchDescription.innerHTML = 'Allow AI to search the web for additional context (Google AI & OpenAI only)';
+                webSearchDescription.style.color = '';
             }
             
             // Reload models for the selected provider
@@ -1074,18 +1144,54 @@
                 // Store provider-specific models
                 providerModels.google = currentConfig.GOOGLE_MODEL || currentConfig.AI_MODEL || 'gemini-2.5-flash';
                 providerModels.openai = currentConfig.OPENAI_MODEL || 'gpt-5-mini';
+                providerModels.ollama = currentConfig.OLLAMA_MODEL || 'llama3.2';
                 
                 // Handle AI provider
                 const provider = currentConfig.AI_PROVIDER || 'google';
                 document.getElementById('ai-provider').value = provider;
                 
-                // Show appropriate API key group
+                // Handle Ollama base URL and parameters
+                document.getElementById('ollama-base-url').value = currentConfig.OLLAMA_BASE_URL || 'http://localhost:11434';
+                document.getElementById('ollama-temperature').value = currentConfig.OLLAMA_TEMPERATURE || 0.1;
+                document.getElementById('ollama-num-predict').value = currentConfig.OLLAMA_NUM_PREDICT || 2048;
+                document.getElementById('ollama-top-k').value = currentConfig.OLLAMA_TOP_K || 40;
+                document.getElementById('ollama-top-p').value = currentConfig.OLLAMA_TOP_P || 0.9;
+                
+                // Show appropriate API key/URL group and handle web search availability
+                const webSearchCheckbox = document.getElementById('web-search');
+                const webSearchLabel = document.querySelector('label[for="web-search"]');
+                const webSearchDescription = document.getElementById('web-search-description');
+                
                 if (provider === 'openai') {
                     document.getElementById('google-api-key-group').style.display = 'none';
                     document.getElementById('openai-api-key-group').style.display = 'block';
+                    document.getElementById('ollama-base-url-group').style.display = 'none';
+                    document.getElementById('ollama-params-group').style.display = 'none';
+                    // Enable web search for OpenAI
+                    webSearchCheckbox.disabled = false;
+                    webSearchLabel.style.opacity = '1';
+                    webSearchLabel.style.cursor = 'pointer';
+                } else if (provider === 'ollama') {
+                    document.getElementById('google-api-key-group').style.display = 'none';
+                    document.getElementById('openai-api-key-group').style.display = 'none';
+                    document.getElementById('ollama-base-url-group').style.display = 'block';
+                    document.getElementById('ollama-params-group').style.display = 'block';
+                    // Disable web search for Ollama
+                    webSearchCheckbox.disabled = true;
+                    webSearchCheckbox.checked = false;
+                    webSearchLabel.style.opacity = '0.5';
+                    webSearchLabel.style.cursor = 'not-allowed';
+                    webSearchDescription.innerHTML = 'Web search is not supported with Ollama (local models only)';
+                    webSearchDescription.style.color = '#999';
                 } else {
                     document.getElementById('google-api-key-group').style.display = 'block';
                     document.getElementById('openai-api-key-group').style.display = 'none';
+                    document.getElementById('ollama-base-url-group').style.display = 'none';
+                    document.getElementById('ollama-params-group').style.display = 'none';
+                    // Enable web search for Google AI
+                    webSearchCheckbox.disabled = false;
+                    webSearchLabel.style.opacity = '1';
+                    webSearchLabel.style.cursor = 'pointer';
                 }
                 
                 // Handle API keys with masking
@@ -1157,7 +1263,7 @@
                             const option = document.createElement('option');
                             option.value = model;
                             
-                            // Add recommended tags
+                            // Add recommended tags and text content
                             if (provider === 'google') {
                                 if (model === 'gemini-2.5-flash') {
                                     option.textContent = model + ' (recommended)';
@@ -1174,6 +1280,19 @@
                                 } else {
                                     option.textContent = model;
                                 }
+                            } else if (provider === 'ollama') {
+                                // Ollama models - just display the name
+                                if (model === 'llama3.2') {
+                                    option.textContent = model + ' (recommended)';
+                                } else if (model.startsWith('Error:') || model.startsWith('No models')) {
+                                    option.textContent = model;
+                                    option.disabled = true;
+                                } else {
+                                    option.textContent = model;
+                                }
+                            } else {
+                                // Fallback for any other provider
+                                option.textContent = model;
                             }
                             
                             modelSelect.appendChild(option);
@@ -1181,19 +1300,34 @@
                         
                         // Restore provider-specific model
                         const savedModel = providerModels[provider];
-                        const standardModels = models.filter(m => m !== 'custom');
+                        const standardModels = models.filter(m => m !== 'custom' && !m.startsWith('Error:') && !m.startsWith('No models'));
                         
                         if (savedModel && standardModels.includes(savedModel)) {
                             modelSelect.value = savedModel;
-                        } else if (savedModel && !standardModels.includes(savedModel)) {
-                            // It's a custom model
+                        } else if (savedModel && !standardModels.includes(savedModel) && provider !== 'ollama') {
+                            // It's a custom model (not for Ollama)
                             modelSelect.value = 'custom';
                             document.getElementById('custom-model').value = savedModel;
                             handleModelChange();
                         } else {
-                            // Default to recommended model
-                            const recommendedModel = provider === 'google' ? 'gemini-2.5-flash' : 'gpt-5-mini';
-                            modelSelect.value = recommendedModel;
+                            // Default to recommended model based on provider
+                            let recommendedModel = 'gemini-2.5-flash';
+                            if (provider === 'openai') {
+                                recommendedModel = 'gpt-5-mini';
+                            } else if (provider === 'ollama') {
+                                // For Ollama, try to find a recommended model or use the first available
+                                if (standardModels.includes('llama3.2')) {
+                                    recommendedModel = 'llama3.2';
+                                } else if (standardModels.length > 0) {
+                                    recommendedModel = standardModels[0];
+                                }
+                            }
+                            
+                            if (standardModels.includes(recommendedModel)) {
+                                modelSelect.value = recommendedModel;
+                            } else if (standardModels.length > 0) {
+                                modelSelect.value = standardModels[0];
+                            }
                         }
                     }
                 } else {
@@ -1209,6 +1343,85 @@
         
         // Add event listener for model dropdown
         document.getElementById('ai-model').addEventListener('change', handleModelChange);
+        
+        // Function to manually refresh Ollama models
+        async function refreshOllamaModels() {
+            const provider = document.getElementById('ai-provider').value;
+            
+            if (provider !== 'ollama') {
+                showAlert('Please select Ollama as the AI provider first', 'error');
+                return;
+            }
+            
+            const ollamaUrl = document.getElementById('ollama-base-url').value;
+            
+            if (!ollamaUrl || !ollamaUrl.trim()) {
+                showAlert('Please enter an Ollama Base URL first', 'error');
+                return;
+            }
+            
+            await loadModelsWithUrl(ollamaUrl);
+        }
+        
+        // Function to load models with a specific Ollama URL
+        async function loadModelsWithUrl(ollamaUrl) {
+            const modelSelect = document.getElementById('ai-model');
+            const provider = document.getElementById('ai-provider').value;
+            
+            if (provider !== 'ollama') {
+                return;
+            }
+            
+            modelSelect.disabled = true;
+            modelSelect.innerHTML = '<option value="">Loading models from ' + ollamaUrl + '...</option>';
+            
+            try {
+                // Fetch models directly from the Ollama server
+                const response = await fetch(ollamaUrl + '/api/tags', {
+                    method: 'GET',
+                    timeout: 5000
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const models = data.models ? data.models.map(m => m.name) : [];
+                    
+                    modelSelect.innerHTML = '';
+                    
+                    if (models.length === 0) {
+                        modelSelect.innerHTML = '<option value="" disabled>No models available</option>';
+                    } else {
+                        models.forEach(model => {
+                            const option = document.createElement('option');
+                            option.value = model;
+                            if (model === 'llama3.2') {
+                                option.textContent = model + ' (recommended)';
+                            } else {
+                                option.textContent = model;
+                            }
+                            modelSelect.appendChild(option);
+                        });
+                        
+                        // Try to restore saved model or select first one
+                        const savedModel = providerModels.ollama;
+                        if (savedModel && models.includes(savedModel)) {
+                            modelSelect.value = savedModel;
+                        } else if (models.includes('llama3.2')) {
+                            modelSelect.value = 'llama3.2';
+                        } else {
+                            modelSelect.value = models[0];
+                        }
+                    }
+                } else {
+                    modelSelect.innerHTML = '<option value="" disabled>Error: Cannot connect to Ollama server</option>';
+                }
+            } catch (error) {
+                console.error('Error loading Ollama models:', error);
+                modelSelect.innerHTML = '<option value="" disabled>Error: Cannot connect to Ollama server</option>';
+            } finally {
+                modelSelect.disabled = false;
+            }
+        }
         
         document.getElementById('settings-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1266,6 +1479,8 @@
                         config['GOOGLE_MODEL'] = config[key];
                     } else if (provider === 'openai') {
                         config['OPENAI_MODEL'] = config[key];
+                    } else if (provider === 'ollama') {
+                        config['OLLAMA_MODEL'] = config[key];
                     }
                 } else {
                     config[key] = value;

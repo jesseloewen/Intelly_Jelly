@@ -28,6 +28,10 @@ class AIProcessor:
             "gpt-5-nano",
             "custom"
         ]
+        
+        # Ollama models are fetched dynamically from the server
+        self.ollama_models_cache = []
+        self.ollama_models_cache_time = 0
 
     def _get_instructions(self) -> str:
         # Check for custom instructions first, fall back to base instructions
@@ -85,6 +89,8 @@ class AIProcessor:
         
         if provider == 'openai':
             return self._process_batch_openai(file_paths, custom_prompt, include_default, include_filename, enable_web_search)
+        elif provider == 'ollama':
+            return self._process_batch_ollama(file_paths, custom_prompt, include_default, include_filename, enable_web_search)
         else:
             return self._process_batch_google(file_paths, custom_prompt, include_default, include_filename, enable_web_search)
     
@@ -313,5 +319,160 @@ class AIProcessor:
         
         if provider == 'openai':
             return self.OPENAI_MODELS
+        elif provider == 'ollama':
+            return self._get_ollama_models()
         else:
             return self.GOOGLE_MODELS
+    
+    def _get_ollama_models(self) -> List[str]:
+        """Fetch available models from Ollama server."""
+        # Cache models for 5 minutes to avoid excessive API calls
+        current_time = time.time()
+        if self.ollama_models_cache and (current_time - self.ollama_models_cache_time) < 300:
+            logger.debug("Returning cached Ollama models")
+            return self.ollama_models_cache
+        
+        base_url = self.config_manager.get('OLLAMA_BASE_URL', 'http://localhost:11434')
+        
+        try:
+            logger.info(f"Fetching available models from Ollama: {base_url}")
+            response = requests.get(f"{base_url}/api/tags", timeout=5)
+            response.raise_for_status()
+            
+            data = response.json()
+            models = [model['name'] for model in data.get('models', [])]
+            
+            if not models:
+                logger.warning("No models available from Ollama server")
+                return ["No models available"]
+            
+            logger.info(f"Found {len(models)} Ollama models: {models}")
+            self.ollama_models_cache = models
+            self.ollama_models_cache_time = current_time
+            
+            return models
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to fetch Ollama models: {e}")
+            return ["Error: Cannot connect to Ollama server"]
+        except Exception as e:
+            logger.error(f"Unexpected error fetching Ollama models: {e}")
+            return ["Error: Failed to fetch models"]
+    
+    def _process_batch_ollama(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False) -> List[Dict]:
+        """Process files using Ollama."""
+        base_url = self.config_manager.get('OLLAMA_BASE_URL', 'http://localhost:11434')
+        if not base_url:
+            logger.error("OLLAMA_BASE_URL not found in configuration")
+            raise ValueError("OLLAMA_BASE_URL not set. Please configure it in Settings.")
+        
+        model = self.config_manager.get('AI_MODEL', 'llama3.2')
+        logger.info(f"Using Ollama model: {model}")
+        prompt = self._prepare_batch_prompt(file_paths, custom_prompt, include_default, include_filename)
+        
+        if enable_web_search:
+            logger.warning("Web search is not supported with Ollama, ignoring this option")
+        
+        try:
+            # Enforce delay between API calls
+            delay_seconds = self.config_manager.get('AI_CALL_DELAY_SECONDS', 2)
+            time_since_last_call = time.time() - self.last_api_call_time
+            
+            if time_since_last_call < delay_seconds:
+                wait_time = delay_seconds - time_since_last_call
+                logger.info(f"Rate limit protection: waiting {wait_time:.2f} seconds before API call")
+                time.sleep(wait_time)
+            
+            logger.info(f"Sending request to Ollama API: {model}")
+            
+            # Log full request
+            logger.info("=" * 80)
+            logger.info("OLLAMA API REQUEST")
+            logger.info("=" * 80)
+            logger.info(f"Base URL: {base_url}")
+            logger.info(f"Model: {model}")
+            logger.info(f"Prompt (first 500 chars): {prompt[:500]}...")
+            logger.info(f"Full Prompt:\n{prompt}")
+            logger.info("=" * 80)
+            
+            # Use Ollama's generate endpoint with configurable parameters
+            url = f"{base_url}/api/generate"
+            
+            # Get Ollama parameters from config (with defaults)
+            temperature = self.config_manager.get('OLLAMA_TEMPERATURE', 0.1)
+            num_predict = self.config_manager.get('OLLAMA_NUM_PREDICT', 2048)
+            top_k = self.config_manager.get('OLLAMA_TOP_K', 40)
+            top_p = self.config_manager.get('OLLAMA_TOP_P', 0.9)
+            
+            payload = {
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": temperature,
+                    "num_predict": num_predict,
+                    "top_k": top_k,
+                    "top_p": top_p
+                }
+            }
+            
+            logger.info(f"Ollama options: temperature={temperature}, num_predict={num_predict}, top_k={top_k}, top_p={top_p}")
+            
+            response = requests.post(url, json=payload, timeout=120)
+            self.last_api_call_time = time.time()
+            response.raise_for_status()
+            
+            logger.info(f"Received successful response from Ollama API (status: {response.status_code})")
+            
+            data = response.json()
+            text = data.get('response', '')
+            
+            # Log full response
+            logger.info("=" * 80)
+            logger.info("OLLAMA API RESPONSE")
+            logger.info("=" * 80)
+            logger.info(f"Status Code: {response.status_code}")
+            logger.info(f"Full Response:\n{json.dumps(data, indent=2)}")
+            logger.info("=" * 80)
+            
+            logger.debug(f"Raw AI response length: {len(text)} characters")
+            
+            # Parse response
+            text = text.strip()
+            if text.startswith('```json'):
+                text = text[7:]
+            if text.startswith('```'):
+                text = text[3:]
+            if text.endswith('```'):
+                text = text[:-3]
+            text = text.strip()
+            
+            logger.debug("Parsing AI response as JSON")
+            result = json.loads(text)
+            
+            if isinstance(result, dict) and 'files' in result:
+                logger.info(f"AI processing completed successfully: {len(result['files'])} results returned")
+                return result['files']
+            elif isinstance(result, list):
+                logger.info(f"AI processing completed successfully: {len(result)} results returned")
+                return result
+            else:
+                logger.warning("AI response did not contain expected format, returning empty list")
+                return []
+                
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"Ollama API HTTP error: {e}, Status code: {response.status_code if 'response' in locals() else 'N/A'}")
+            logger.error(f"Response content: {response.text if 'response' in locals() else 'N/A'}")
+            raise
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse AI response as JSON: {e}")
+            logger.error(f"Raw response text: {text if 'text' in locals() else 'N/A'}")
+            raise
+        except requests.exceptions.Timeout:
+            logger.error("Ollama API request timed out")
+            raise
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Ollama API connection error: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error during AI processing: {type(e).__name__}: {e}")
+            raise

@@ -391,6 +391,7 @@ def update_config():
         'AI_MODEL',
         'GOOGLE_MODEL',
         'OPENAI_MODEL',
+        'OLLAMA_MODEL',
         'ENABLE_WEB_SEARCH',
         'AI_CALL_DELAY_SECONDS',
         'JELLYFIN_REFRESH_ENABLED',
@@ -398,6 +399,11 @@ def update_config():
         'ADMIN_PASSWORD',
         'GOOGLE_API_KEY',
         'OPENAI_API_KEY',
+        'OLLAMA_BASE_URL',
+        'OLLAMA_TEMPERATURE',
+        'OLLAMA_NUM_PREDICT',
+        'OLLAMA_TOP_K',
+        'OLLAMA_TOP_P',
         'JELLYFIN_API_KEY'
     ]
     
