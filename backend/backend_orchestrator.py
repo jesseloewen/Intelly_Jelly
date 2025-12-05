@@ -69,6 +69,9 @@ class BackendOrchestrator:
         self.queue_thread.start()
         logger.debug("Queue worker thread started")
         
+        # Scan for existing files in downloading folder
+        self._scan_existing_files()
+        
         logger.info("Backend orchestrator started successfully")
 
     def stop(self):
@@ -139,6 +142,33 @@ class BackendOrchestrator:
             logger.info(f"Created job {job.job_id} for {relative_path} - added to queue (web_search={job.enable_web_search})")
         
         # Job is now in queue and will be processed by queue worker
+
+    def _scan_existing_files(self):
+        """
+        Scan the downloading folder for existing files at startup and create jobs for them.
+        """
+        downloading_path = self.config_manager.get('DOWNLOADING_PATH')
+        if not os.path.exists(downloading_path):
+            logger.warning(f"Downloading folder does not exist: {downloading_path}")
+            return
+        
+        logger.info(f"Scanning for existing files in: {downloading_path}")
+        file_count = 0
+        
+        # Walk through all files in the downloading folder recursively
+        for root, dirs, files in os.walk(downloading_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                relative_path = os.path.relpath(file_path, downloading_path)
+                
+                # Use the existing file detection logic
+                self._on_file_detected(file_path, relative_path)
+                file_count += 1
+        
+        if file_count > 0:
+            logger.info(f"Found {file_count} existing file(s) in downloading folder")
+        else:
+            logger.info("No existing files found in downloading folder")
 
     def _check_stalled_queue(self):
         """
