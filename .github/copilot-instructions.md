@@ -49,8 +49,12 @@ The queue worker includes automatic stall detection:
 
 - **Google AI (recommended)**: Uses `gemini-2.5-flash` model by default
 - OpenAI: Uses `gpt-5-mini` model by default
+- **Ollama (local)**: Uses `llama3.2` model by default, configurable base URL (default: `http://localhost:11434`)
+  - Models are fetched dynamically from Ollama server via `/api/tags` endpoint
+  - Model list cached for 5 minutes to reduce API calls
+  - Web search not supported with Ollama (UI automatically disables the option when Ollama is selected)
 - Rate limiting: 2-second delay between API calls (configurable via `AI_CALL_DELAY_SECONDS`)
-- Web search enabled per-job via `enable_web_search` flag
+- Web search enabled per-job via `enable_web_search` flag (Google AI and OpenAI only)
 - AI prompt lives in `instruction_prompt.md` (authoritative rules for output format)
 
 ## Configuration Management

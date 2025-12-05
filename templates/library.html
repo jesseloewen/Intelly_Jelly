@@ -1011,12 +1011,42 @@
             }
         }
         
-        function openReAIModal(file) {
+        async function openReAIModal(file) {
             console.log('Opening Re-AI modal for file:', file);
             currentFilePath = file.full_path;
             currentHasSubtitle = file.is_video && (file.has_subtitle || false);
             document.getElementById('reai-current-name').value = file.filename;
             document.getElementById('reai-prompt').value = '';
+            
+            // Check AI provider and disable web search if Ollama
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                const provider = config.AI_PROVIDER || 'google';
+                
+                const webSearchCheckbox = document.getElementById('reai-web-search');
+                const webSearchLabel = webSearchCheckbox.closest('.checkbox-label');
+                
+                if (provider === 'ollama') {
+                    webSearchCheckbox.disabled = true;
+                    webSearchCheckbox.checked = false;
+                    if (webSearchLabel) {
+                        webSearchLabel.style.opacity = '0.5';
+                        webSearchLabel.style.cursor = 'not-allowed';
+                        webSearchLabel.title = 'Web search is not supported with Ollama';
+                    }
+                } else {
+                    webSearchCheckbox.disabled = false;
+                    if (webSearchLabel) {
+                        webSearchLabel.style.opacity = '1';
+                        webSearchLabel.style.cursor = 'pointer';
+                        webSearchLabel.title = '';
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking AI provider:', error);
+            }
+            
             document.getElementById('reai-modal').classList.add('active');
             console.log('currentFilePath set to:', currentFilePath);
         }
