@@ -66,26 +66,29 @@ Intelly_Jelly/
 ### Setup
 
 1. **Clone the repository**
-   ```powershell
+   ```bash
    git clone https://github.com/JL-Bones/Intelly_Jelly.git
    cd Intelly_Jelly
    ```
 
 2. **Install dependencies**
-   ```powershell
+   ```bash
+   pip install -r requirements.txt
+   ```
+
 3. **Configure your paths and AI provider**
    
    On first run, you'll need to configure:
    - Downloading folder path (where files are being downloaded)
    - Completed folder path (where downloads finish)
    - Library path (where organized files go)
-   - AI provider and credentials (see AI Provider Setup below) (where files are being downloaded)
-   - Completed folder path (where downloads finish)
-   - Library path (where organized files go)
-   - AI API endpoint and key
+   - AI provider and credentials (see AI Provider Setup below)
 
 4. **Run the application**
-   ```powershell
+   ```bash
+   python app.py
+   ```
+
 5. **Access the web interface**
    
    Open your browser to `http://localhost:5000`

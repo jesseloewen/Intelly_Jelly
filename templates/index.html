@@ -66,9 +66,14 @@
             padding: 20px 30px;
             border-radius: 10px;
             margin-bottom: 20px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            display: flex;
+            justify-content: space-evenly;
             gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .stat-item {
+            min-width: 150px;
         }
         
         .stat-item {
@@ -569,10 +574,6 @@
                 <div class="stat-label">Pending</div>
             </div>
             <div class="stat-item">
-                <div class="stat-value" id="stat-completed">0</div>
-                <div class="stat-label">Completed</div>
-            </div>
-            <div class="stat-item">
                 <div class="stat-value" id="stat-failed">0</div>
                 <div class="stat-label">Failed</div>
             </div>
@@ -701,7 +702,6 @@
                 document.getElementById('stat-queued').textContent = stats.queued;
                 document.getElementById('stat-processing').textContent = stats.processing;
                 document.getElementById('stat-pending').textContent = stats.pending;
-                document.getElementById('stat-completed').textContent = stats.completed;
                 document.getElementById('stat-failed').textContent = stats.failed;
             } catch (error) {
                 console.error('Error loading stats:', error);
