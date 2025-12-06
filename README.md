@@ -107,6 +107,8 @@ Intelly Jelly supports three AI providers. Choose the one that fits your needs:
   3. Enter your API key
   4. Enable web search and/or TMDB tool if desired
 
+**Note**: `gemini-2.5-flash` with web search enabled is the most thoroughly tested configuration and provides the best results for media organization.
+
 ### OpenAI
 - **Model**: `gpt-5-mini` (default, configurable)
 - **Pros**: Reliable, supports TMDB tool with function calling

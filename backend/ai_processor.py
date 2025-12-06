@@ -291,16 +291,22 @@ class AIProcessor:
         
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         
+        # Get Google AI parameters from config with defaults
+        temperature = float(self.config_manager.get('GOOGLE_TEMPERATURE', 0.1))
+        max_tokens = int(self.config_manager.get('GOOGLE_MAX_TOKENS', 2048))
+        top_k = int(self.config_manager.get('GOOGLE_TOP_K', 1))
+        top_p = float(self.config_manager.get('GOOGLE_TOP_P', 1))
+        
         # Build base payload
         payload = {
             "contents": [{
                 "parts": [{"text": prompt}]
             }],
             "generationConfig": {
-                "temperature": 0.1,
-                "topK": 1,
-                "topP": 1,
-                "maxOutputTokens": 2048,
+                "temperature": temperature,
+                "topK": top_k,
+                "topP": top_p,
+                "maxOutputTokens": max_tokens,
             }
         }
         
@@ -510,6 +516,13 @@ class AIProcessor:
                 logger.info(f"Tools: {json.dumps(tools, indent=2)}")
             logger.info("=" * 80)
             
+            # Get OpenAI parameters from config with defaults
+            temperature = float(self.config_manager.get('OPENAI_TEMPERATURE', 0.1))
+            max_tokens = int(self.config_manager.get('OPENAI_MAX_TOKENS', 2048))
+            top_p = float(self.config_manager.get('OPENAI_TOP_P', 1))
+            frequency_penalty = float(self.config_manager.get('OPENAI_FREQUENCY_PENALTY', 0))
+            presence_penalty = float(self.config_manager.get('OPENAI_PRESENCE_PENALTY', 0))
+            
             # OpenAI's responses API doesn't support function calling/tools
             # Use chat.completions when tools are needed, responses otherwise
             if use_chat_api:
@@ -526,7 +539,12 @@ class AIProcessor:
                         model=model,
                         messages=messages,
                         tools=tools,
-                        tool_choice="auto"
+                        tool_choice="auto",
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        top_p=top_p,
+                        frequency_penalty=frequency_penalty,
+                        presence_penalty=presence_penalty
                     )
                     
                     self.last_api_call_time = time.time()
@@ -576,7 +594,12 @@ class AIProcessor:
                 # Use responses.create API (no tools needed)
                 response = self.openai_client.responses.create(
                     model=model,
-                    input=prompt
+                    input=prompt,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    top_p=top_p,
+                    frequency_penalty=frequency_penalty,
+                    presence_penalty=presence_penalty
                 )
                 
                 self.last_api_call_time = time.time()

@@ -746,7 +746,7 @@
                                 <option value="openai">OpenAI</option>
                                 <option value="ollama">Ollama (local)</option>
                             </select>
-                            <small>Select which AI provider to use</small>
+                            <small>Select which AI provider to use. <strong>Note:</strong> gemini-2.5-flash with web search enabled is the most tested configuration.</small>
                         </div>
                         
                         <div class="form-group" id="google-api-key-group">
@@ -786,6 +786,77 @@
                                 </button>
                             </div>
                             <small id="ai-model-description">Select the AI model to use</small>
+                        </div>
+                        
+                        <!-- Collapsible Advanced Google AI Parameters -->
+                        <div class="settings-section" id="google-params-section" style="display: none; margin-bottom: 20px;">
+                            <div class="section-header" onclick="toggleSection('google-params')">
+                                <h3 style="font-size: 14px; font-weight: 600;">Advanced Model Parameters</h3>
+                                <span class="section-toggle" id="google-params-toggle">▼</span>
+                            </div>
+                            <div class="section-content collapsed" id="google-params-content">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                    <div class="form-group" style="margin-bottom: 10px;">
+                                        <label for="google-temperature" style="font-size: 13px; font-weight: normal;">Temperature</label>
+                                        <input type="number" id="google-temperature" name="GOOGLE_TEMPERATURE" min="0" max="2" step="0.1" placeholder="0.1">
+                                        <small style="font-size: 11px;">Creativity level (0-2, default: 0.1)</small>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 10px;">
+                                        <label for="google-max-tokens" style="font-size: 13px; font-weight: normal;">Max Tokens</label>
+                                        <input type="number" id="google-max-tokens" name="GOOGLE_MAX_TOKENS" min="128" max="8192" step="128" placeholder="2048">
+                                        <small style="font-size: 11px;">Maximum response length (default: 2048)</small>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 10px;">
+                                        <label for="google-top-k" style="font-size: 13px; font-weight: normal;">Top K</label>
+                                        <input type="number" id="google-top-k" name="GOOGLE_TOP_K" min="1" max="100" step="1" placeholder="1">
+                                        <small style="font-size: 11px;">Sampling parameter (default: 1)</small>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 10px;">
+                                        <label for="google-top-p" style="font-size: 13px; font-weight: normal;">Top P</label>
+                                        <input type="number" id="google-top-p" name="GOOGLE_TOP_P" min="0" max="1" step="0.05" placeholder="1">
+                                        <small style="font-size: 11px;">Nucleus sampling (default: 1)</small>
+                                    </div>
+                                </div>
+                                <small style="margin-top: 10px; display: block; color: var(--text-secondary);">Fine-tune Google AI model behavior by adjusting these parameters</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Collapsible Advanced OpenAI Parameters -->
+                        <div class="settings-section" id="openai-params-section" style="display: none; margin-bottom: 20px;">
+                            <div class="section-header" onclick="toggleSection('openai-params')">
+                                <h3 style="font-size: 14px; font-weight: 600;">Advanced Model Parameters</h3>
+                                <span class="section-toggle" id="openai-params-toggle">▼</span>
+                            </div>
+                            <div class="section-content collapsed" id="openai-params-content">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                    <div class="form-group" style="margin-bottom: 10px;">
+                                        <label for="openai-temperature" style="font-size: 13px; font-weight: normal;">Temperature</label>
+                                        <input type="number" id="openai-temperature" name="OPENAI_TEMPERATURE" min="0" max="2" step="0.1" placeholder="0.1">
+                                        <small style="font-size: 11px;">Creativity level (0-2, default: 0.1)</small>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 10px;">
+                                        <label for="openai-max-tokens" style="font-size: 13px; font-weight: normal;">Max Tokens</label>
+                                        <input type="number" id="openai-max-tokens" name="OPENAI_MAX_TOKENS" min="128" max="8192" step="128" placeholder="2048">
+                                        <small style="font-size: 11px;">Maximum response length (default: 2048)</small>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 10px;">
+                                        <label for="openai-top-p" style="font-size: 13px; font-weight: normal;">Top P</label>
+                                        <input type="number" id="openai-top-p" name="OPENAI_TOP_P" min="0" max="1" step="0.05" placeholder="1">
+                                        <small style="font-size: 11px;">Nucleus sampling (default: 1)</small>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 10px;">
+                                        <label for="openai-frequency-penalty" style="font-size: 13px; font-weight: normal;">Frequency Penalty</label>
+                                        <input type="number" id="openai-frequency-penalty" name="OPENAI_FREQUENCY_PENALTY" min="-2" max="2" step="0.1" placeholder="0">
+                                        <small style="font-size: 11px;">Reduce repetition (-2 to 2, default: 0)</small>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 10px;">
+                                        <label for="openai-presence-penalty" style="font-size: 13px; font-weight: normal;">Presence Penalty</label>
+                                        <input type="number" id="openai-presence-penalty" name="OPENAI_PRESENCE_PENALTY" min="-2" max="2" step="0.1" placeholder="0">
+                                        <small style="font-size: 11px;">Encourage new topics (-2 to 2, default: 0)</small>
+                                    </div>
+                                </div>
+                                <small style="margin-top: 10px; display: block; color: var(--text-secondary);">Fine-tune OpenAI model behavior by adjusting these parameters</small>
+                            </div>
                         </div>
                         
                         <!-- Collapsible Advanced Ollama Parameters -->
@@ -1021,13 +1092,13 @@
         
         // Restore section states from localStorage (default to collapsed)
         function restoreSectionStates() {
-            const sections = ['folder-paths', 'ai-config', 'jellyfin', 'security', 'ollama-params'];
+            const sections = ['folder-paths', 'ai-config', 'jellyfin', 'security', 'google-params', 'openai-params', 'ollama-params'];
             sections.forEach(sectionId => {
                 const state = localStorage.getItem('section-' + sectionId);
                 const content = document.getElementById(sectionId + '-content');
                 const toggle = document.getElementById(sectionId + '-toggle');
                 
-                // Skip if elements don't exist (e.g., ollama-params when not in Ollama mode)
+                // Skip if elements don't exist (e.g., provider-specific params when not in that mode)
                 if (!content || !toggle) return;
                 
                 // Default to collapsed if no state is saved, or if state is 'collapsed'
@@ -1099,10 +1170,15 @@
             const webSearchDescription = document.getElementById('web-search-description');
             
             // Switch API key/URL display based on provider
+            const googleParamsSection = document.getElementById('google-params-section');
+            const openaiParamsSection = document.getElementById('openai-params-section');
+            
             if (provider === 'openai') {
                 googleKeyGroup.style.display = 'none';
                 openaiKeyGroup.style.display = 'block';
                 ollamaBaseUrlGroup.style.display = 'none';
+                googleParamsSection.style.display = 'none';
+                openaiParamsSection.style.display = 'block';
                 ollamaParamsSection.style.display = 'none';
                 refreshOllamaBtn.style.display = 'none';
                 // Enable web search for OpenAI
@@ -1113,6 +1189,8 @@
                 googleKeyGroup.style.display = 'none';
                 openaiKeyGroup.style.display = 'none';
                 ollamaBaseUrlGroup.style.display = 'block';
+                googleParamsSection.style.display = 'none';
+                openaiParamsSection.style.display = 'none';
                 ollamaParamsSection.style.display = 'block';
                 refreshOllamaBtn.style.display = 'inline-block';
                 // Disable web search for Ollama
@@ -1126,6 +1204,8 @@
                 googleKeyGroup.style.display = 'block';
                 openaiKeyGroup.style.display = 'none';
                 ollamaBaseUrlGroup.style.display = 'none';
+                googleParamsSection.style.display = 'block';
+                openaiParamsSection.style.display = 'none';
                 ollamaParamsSection.style.display = 'none';
                 refreshOllamaBtn.style.display = 'none';
                 // Enable web search for Google AI
@@ -1191,6 +1271,19 @@
                 const provider = currentConfig.AI_PROVIDER || 'google';
                 document.getElementById('ai-provider').value = provider;
                 
+                // Handle Google AI parameters
+                document.getElementById('google-temperature').value = currentConfig.GOOGLE_TEMPERATURE || 0.1;
+                document.getElementById('google-max-tokens').value = currentConfig.GOOGLE_MAX_TOKENS || 2048;
+                document.getElementById('google-top-k').value = currentConfig.GOOGLE_TOP_K || 1;
+                document.getElementById('google-top-p').value = currentConfig.GOOGLE_TOP_P || 1;
+                
+                // Handle OpenAI parameters
+                document.getElementById('openai-temperature').value = currentConfig.OPENAI_TEMPERATURE || 0.1;
+                document.getElementById('openai-max-tokens').value = currentConfig.OPENAI_MAX_TOKENS || 2048;
+                document.getElementById('openai-top-p').value = currentConfig.OPENAI_TOP_P || 1;
+                document.getElementById('openai-frequency-penalty').value = currentConfig.OPENAI_FREQUENCY_PENALTY || 0;
+                document.getElementById('openai-presence-penalty').value = currentConfig.OPENAI_PRESENCE_PENALTY || 0;
+                
                 // Handle Ollama base URL and parameters
                 document.getElementById('ollama-base-url').value = currentConfig.OLLAMA_BASE_URL || 'http://localhost:11434';
                 document.getElementById('ollama-temperature').value = currentConfig.OLLAMA_TEMPERATURE || 0.1;
@@ -1209,6 +1302,8 @@
                     document.getElementById('google-api-key-group').style.display = 'none';
                     document.getElementById('openai-api-key-group').style.display = 'block';
                     document.getElementById('ollama-base-url-group').style.display = 'none';
+                    document.getElementById('google-params-section').style.display = 'none';
+                    document.getElementById('openai-params-section').style.display = 'block';
                     document.getElementById('ollama-params-section').style.display = 'none';
                     refreshOllamaBtn.style.display = 'none';
                     // Enable web search for OpenAI
@@ -1219,6 +1314,8 @@
                     document.getElementById('google-api-key-group').style.display = 'none';
                     document.getElementById('openai-api-key-group').style.display = 'none';
                     document.getElementById('ollama-base-url-group').style.display = 'block';
+                    document.getElementById('google-params-section').style.display = 'none';
+                    document.getElementById('openai-params-section').style.display = 'none';
                     document.getElementById('ollama-params-section').style.display = 'block';
                     refreshOllamaBtn.style.display = 'inline-block';
                     // Disable web search for Ollama
@@ -1232,6 +1329,8 @@
                     document.getElementById('google-api-key-group').style.display = 'block';
                     document.getElementById('openai-api-key-group').style.display = 'none';
                     document.getElementById('ollama-base-url-group').style.display = 'none';
+                    document.getElementById('google-params-section').style.display = 'block';
+                    document.getElementById('openai-params-section').style.display = 'none';
                     document.getElementById('ollama-params-section').style.display = 'none';
                     refreshOllamaBtn.style.display = 'none';
                     // Enable web search for Google AI
