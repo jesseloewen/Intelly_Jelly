@@ -190,6 +190,75 @@
             color: white;
         }
         
+        .btn-upload {
+            background: #00b894;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-upload:hover {
+            background: #00a383;
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--primary-color);
+            background: var(--table-row-hover);
+        }
+        
+        .upload-area.drag-over {
+            border-color: var(--primary-color);
+            background: var(--table-row-hover);
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        
+        .file-list {
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .file-item {
+            padding: 8px;
+            background: var(--table-row-hover);
+            border-radius: 5px;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .file-item-remove {
+            background: #d63031;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
         .modal {
             display: none;
             position: fixed;
@@ -544,6 +613,10 @@
                 <a href="/" style="text-decoration: none; color: inherit;"><h1>🍇 Intelly Jelly</h1></a>
             </div>
             <div class="header-right">
+                <button class="btn-upload" onclick="openUploadModal()">
+                    <span>📤</span>
+                    Upload Files
+                </button>
                 <div class="nav-links">
                     <a href="/">Downloads</a>
                     <a href="/library">Library</a>
@@ -632,6 +705,32 @@
             <div class="form-actions">
                 <button class="btn-secondary" onclick="closeReAIModal()">Cancel</button>
                 <button class="btn-primary" onclick="saveReAI()">Regen</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Upload Modal -->
+    <div class="modal" id="upload-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Upload Files</h3>
+                <button class="close-btn" onclick="closeUploadModal()">&times;</button>
+            </div>
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">📁</div>
+                <p>Select files or folders to upload</p>
+                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+                    <button type="button" class="btn-primary" onclick="document.getElementById('file-input-files').click(); event.stopPropagation();">Choose Files</button>
+                    <button type="button" class="btn-primary" onclick="document.getElementById('file-input-folder').click(); event.stopPropagation();">Choose Folder</button>
+                </div>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">Or drag and drop files here</p>
+            </div>
+            <input type="file" id="file-input-files" multiple style="display: none;" onchange="handleFileSelect(event)">
+            <input type="file" id="file-input-folder" multiple webkitdirectory directory style="display: none;" onchange="handleFileSelect(event)">
+            <div class="file-list" id="file-list"></div>
+            <div class="form-actions">
+                <button class="btn-secondary" onclick="closeUploadModal()">Cancel</button>
+                <button class="btn-primary" onclick="uploadFiles()" id="upload-btn">Upload</button>
             </div>
         </div>
     </div>
@@ -884,6 +983,142 @@
             } catch (error) {
                 console.error('Error saving re-AI:', error);
                 alert('Error queuing job for re-processing');
+            }
+        }
+        
+        // Upload modal functions
+        let selectedFiles = [];
+        
+        function openUploadModal() {
+            document.getElementById('upload-modal').classList.add('active');
+            selectedFiles = [];
+            document.getElementById('file-list').innerHTML = '';
+        }
+        
+        function closeUploadModal() {
+            document.getElementById('upload-modal').classList.remove('active');
+            selectedFiles = [];
+            document.getElementById('file-list').innerHTML = '';
+            document.getElementById('file-input-files').value = '';
+            document.getElementById('file-input-folder').value = '';
+        }
+        
+        function handleFileSelect(event) {
+            const files = Array.from(event.target.files);
+            selectedFiles = files;
+            displayFileList();
+        }
+        
+        function displayFileList() {
+            const fileList = document.getElementById('file-list');
+            fileList.innerHTML = '';
+            
+            if (selectedFiles.length === 0) {
+                return;
+            }
+            
+            const heading = document.createElement('h4');
+            heading.textContent = `${selectedFiles.length} file(s) selected`;
+            heading.style.marginBottom = '10px';
+            fileList.appendChild(heading);
+            
+            selectedFiles.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                
+                const fileName = document.createElement('span');
+                fileName.textContent = file.webkitRelativePath || file.name;
+                fileName.style.fontSize = '13px';
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'file-item-remove';
+                removeBtn.textContent = 'Remove';
+                removeBtn.onclick = () => {
+                    selectedFiles.splice(index, 1);
+                    displayFileList();
+                };
+                
+                fileItem.appendChild(fileName);
+                fileItem.appendChild(removeBtn);
+                fileList.appendChild(fileItem);
+            });
+        }
+        
+        // Drag and drop support
+        const uploadArea = document.getElementById('upload-area');
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => {
+                uploadArea.classList.add('drag-over');
+            }, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => {
+                uploadArea.classList.remove('drag-over');
+            }, false);
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = Array.from(dt.files);
+            selectedFiles = files;
+            displayFileList();
+        }, false);
+        
+        async function uploadFiles() {
+            if (selectedFiles.length === 0) {
+                alert('Please select files to upload');
+                return;
+            }
+            
+            const uploadBtn = document.getElementById('upload-btn');
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+            
+            try {
+                const formData = new FormData();
+                
+                selectedFiles.forEach((file, index) => {
+                    formData.append('files', file);
+                    // Include relative path for folder structure (indexed)
+                    const relativePath = file.webkitRelativePath || file.name;
+                    formData.append(`path_${index}`, relativePath);
+                });
+                
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(result.message || 'Files uploaded successfully!');
+                    closeUploadModal();
+                    // Refresh jobs to show newly uploaded files
+                    setTimeout(() => {
+                        loadJobs();
+                        loadStats();
+                    }, 1000);
+                } else {
+                    alert('Error uploading files: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error uploading files:', error);
+                alert('Error uploading files');
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload';
             }
         }
         

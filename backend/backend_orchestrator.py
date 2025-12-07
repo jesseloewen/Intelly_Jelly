@@ -30,6 +30,7 @@ class BackendOrchestrator:
         
         self.downloading_watcher: Optional[FileWatcher] = None
         self.completed_watcher: Optional[FileWatcher] = None
+        self.uploads_watcher: Optional[FileWatcher] = None
         
         self.queue_thread: Optional[threading.Thread] = None
         self.queue_running = False
@@ -50,11 +51,13 @@ class BackendOrchestrator:
         
         downloading_path = self.config_manager.get('DOWNLOADING_PATH')
         completed_path = self.config_manager.get('COMPLETED_PATH')
+        uploads_path = self.config_manager.get('UPLOADS_PATH')
         
         logger.info(f"Monitoring downloading folder: {downloading_path}")
         logger.info(f"Monitoring completed folder: {completed_path}")
+        logger.info(f"Monitoring uploads folder: {uploads_path}")
         
-        downloading_handler = DownloadingFolderHandler(self._on_file_detected, downloading_path)
+        downloading_handler = DownloadingFolderHandler(lambda fp, rp: self._on_file_detected(fp, rp, 'downloading'), downloading_path)
         self.downloading_watcher = FileWatcher(downloading_path, downloading_handler)
         self.downloading_watcher.start()
         logger.debug("Downloading folder watcher started")
@@ -64,12 +67,18 @@ class BackendOrchestrator:
         self.completed_watcher.start()
         logger.debug("Completed folder watcher started")
         
+        # Start uploads watcher (processed same as downloading)
+        uploads_handler = DownloadingFolderHandler(lambda fp, rp: self._on_file_detected(fp, rp, 'uploads'), uploads_path)
+        self.uploads_watcher = FileWatcher(uploads_path, uploads_handler)
+        self.uploads_watcher.start()
+        logger.debug("Uploads folder watcher started")
+        
         self.queue_running = True
         self.queue_thread = threading.Thread(target=self._queue_worker, daemon=True)
         self.queue_thread.start()
         logger.debug("Queue worker thread started")
         
-        # Scan for existing files in downloading folder
+        # Scan for existing files in both folders
         self._scan_existing_files()
         
         logger.info("Backend orchestrator started successfully")
@@ -92,14 +101,18 @@ class BackendOrchestrator:
             self.completed_watcher.stop()
             logger.debug("Completed folder watcher stopped")
         
+        if self.uploads_watcher:
+            self.uploads_watcher.stop()
+            logger.debug("Uploads folder watcher stopped")
+        
         if self.queue_thread:
             self.queue_thread.join(timeout=5)
             logger.debug("Queue worker thread stopped")
         
         logger.info("Backend orchestrator stopped successfully")
 
-    def _on_file_detected(self, file_path: str, relative_path: str):
-        logger.info(f"File detected in downloading folder: {relative_path}")
+    def _on_file_detected(self, file_path: str, relative_path: str, source_folder: str = 'downloading'):
+        logger.info(f"File detected in {source_folder} folder: {relative_path}")
         logger.debug(f"Full path: {file_path}")
         
         existing_job = self.job_store.get_job_by_path(file_path)
@@ -122,6 +135,8 @@ class BackendOrchestrator:
                 break
         
         job = self.job_store.add_job(file_path, relative_path)
+        # Track which folder this file came from
+        job.source_folder = source_folder
         # Apply default web search and TMDB tool settings from config
         job.enable_web_search = self.config_manager.get('ENABLE_WEB_SEARCH', False)
         job.enable_tmdb_tool = self.config_manager.get('ENABLE_TMDB_TOOL', False)
@@ -140,36 +155,73 @@ class BackendOrchestrator:
         else:
             # Single file, mark as primary
             job.is_group_primary = True
-            logger.info(f"Created job {job.job_id} for {relative_path} - added to queue (web_search={job.enable_web_search}, tmdb_tool={job.enable_tmdb_tool})")
+            logger.info(f"Created job {job.job_id} for {relative_path} - added to queue (web_search={job.enable_web_search}, tmdb_tool={job.enable_tmdb_tool}, source={source_folder})")
         
         # Job is now in queue and will be processed by queue worker
 
     def _scan_existing_files(self):
         """
-        Scan the downloading folder for existing files at startup and create jobs for them.
+        Scan both downloading and completed folders for existing files at startup and create jobs for them.
         """
+        # Scan downloading folder
         downloading_path = self.config_manager.get('DOWNLOADING_PATH')
-        if not os.path.exists(downloading_path):
-            logger.warning(f"Downloading folder does not exist: {downloading_path}")
-            return
-        
-        logger.info(f"Scanning for existing files in: {downloading_path}")
-        file_count = 0
-        
-        # Walk through all files in the downloading folder recursively
-        for root, dirs, files in os.walk(downloading_path):
-            for file in files:
-                file_path = os.path.join(root, file)
-                relative_path = os.path.relpath(file_path, downloading_path)
-                
-                # Use the existing file detection logic
-                self._on_file_detected(file_path, relative_path)
-                file_count += 1
-        
-        if file_count > 0:
-            logger.info(f"Found {file_count} existing file(s) in downloading folder")
+        if os.path.exists(downloading_path):
+            logger.info(f"Scanning for existing files in: {downloading_path}")
+            downloading_count = 0
+            
+            for root, dirs, files in os.walk(downloading_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    relative_path = os.path.relpath(file_path, downloading_path)
+                    self._on_file_detected(file_path, relative_path, 'downloading')
+                    downloading_count += 1
+            
+            if downloading_count > 0:
+                logger.info(f"Found {downloading_count} existing file(s) in downloading folder")
+            else:
+                logger.info("No existing files found in downloading folder")
         else:
-            logger.info("No existing files found in downloading folder")
+            logger.warning(f"Downloading folder does not exist: {downloading_path}")
+        
+        # Scan completed folder
+        completed_path = self.config_manager.get('COMPLETED_PATH')
+        if os.path.exists(completed_path):
+            logger.info(f"Scanning for existing files in: {completed_path}")
+            completed_count = 0
+            
+            for root, dirs, files in os.walk(completed_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    relative_path = os.path.relpath(file_path, completed_path)
+                    self._on_file_completed(file_path, relative_path)
+                    completed_count += 1
+            
+            if completed_count > 0:
+                logger.info(f"Found {completed_count} existing file(s) in completed folder")
+            else:
+                logger.info("No existing files found in completed folder")
+        else:
+            logger.warning(f"Completed folder does not exist: {completed_path}")
+        
+        # Scan uploads folder (same as downloading)
+        uploads_path = self.config_manager.get('UPLOADS_PATH')
+        if os.path.exists(uploads_path):
+            logger.info(f"Scanning for existing files in: {uploads_path}")
+            uploads_count = 0
+            
+            for root, dirs, files in os.walk(uploads_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    relative_path = os.path.relpath(file_path, uploads_path)
+                    self._on_file_detected(file_path, relative_path, 'uploads')
+                    uploads_count += 1
+            
+            if uploads_count > 0:
+                logger.info(f"Found {uploads_count} existing file(s) in uploads folder")
+            else:
+                logger.info("No existing files found in uploads folder")
+        else:
+            logger.warning(f"Uploads folder does not exist: {uploads_path}")
 
     def _check_stalled_queue(self):
         """
@@ -339,6 +391,10 @@ class BackendOrchestrator:
                     )
                     logger.info(f"Job {job.job_id} completed: {job.relative_path} -> {suggested_name} (confidence: {confidence}%)")
                     
+                    # If file came from uploads folder, move it to completed folder
+                    if job.source_folder == 'uploads':
+                        self._move_uploads_to_completed(job)
+                    
                     # If file is already waiting in completed folder, organize it now
                     if job.completed_file_path and os.path.exists(job.completed_file_path):
                         logger.info(f"Job {job.job_id} file already in completed folder, organizing now")
@@ -402,6 +458,10 @@ class BackendOrchestrator:
                 )
                 logger.info(f"Job {job.job_id} completed: {job.relative_path} -> {suggested_name} (confidence: {confidence}%)")
                 
+                # If file came from uploads folder, move it to completed folder
+                if job.source_folder == 'uploads':
+                    self._move_uploads_to_completed(job)
+                
                 # If file is already waiting in completed folder, organize it now
                 if job.completed_file_path and os.path.exists(job.completed_file_path):
                     logger.info(f"Job {job.job_id} file already in completed folder, organizing now")
@@ -437,48 +497,52 @@ class BackendOrchestrator:
             )
 
     def _on_file_completed(self, file_path: str, relative_path: str):
-        logger.info(f"File appeared in completed folder: {relative_path}")
+        logger.info(f"File detected in completed folder: {relative_path}")
         logger.debug(f"Full path: {file_path}")
         
-        job = self.job_store.get_job_by_path(relative_path)
-        
-        if not job:
-            filename = os.path.basename(file_path)
-            logger.debug(f"Job not found by relative path, trying filename: {filename}")
-            job = self.job_store.get_job_by_path(filename)
-        
-        if not job:
-            logger.debug("Job not found by filename, searching all jobs by relative path")
-            for j in self.job_store.get_all_jobs():
-                if j.relative_path == relative_path:
-                    job = j
-                    break
-        
-        if not job:
-            filename = os.path.basename(file_path)
-            logger.debug("Job not found by relative path, searching all jobs by basename")
-            for j in self.job_store.get_all_jobs():
-                if os.path.basename(j.original_path) == filename:
-                    job = j
-                    break
-        
-        if not job:
-            logger.warning(f"No matching job found for {relative_path}")
+        # Check if job already exists for this file
+        existing_job = self.job_store.get_job_by_path(file_path)
+        if existing_job:
+            logger.info(f"Job already exists for {relative_path} (job_id: {existing_job.job_id})") 
             return
         
-        logger.info(f"Found matching job {job.job_id} for {relative_path}")
+        # No existing job, create a new one (same logic as downloading folder)
+        file_dir = os.path.dirname(relative_path)
+        base_name = os.path.splitext(os.path.basename(relative_path))[0]
         
-        # Store the completed file path for later organization
-        job.completed_file_path = file_path
+        # Find existing job with same base name in the same directory
+        existing_group_job = None
+        for job in self.job_store.get_all_jobs():
+            job_dir = os.path.dirname(job.relative_path)
+            job_base_name = os.path.splitext(os.path.basename(job.relative_path))[0]
+            if job_base_name == base_name and job_dir == file_dir:
+                existing_group_job = job
+                break
         
-        # If AI processing is done (PENDING_COMPLETION or MANUAL_EDIT), organize immediately
-        if job.status == JobStatus.PENDING_COMPLETION or job.status == JobStatus.MANUAL_EDIT:
-            logger.info(f"Job {job.job_id} AI processing complete, organizing now")
-            self._organize_file(job, file_path)
+        job = self.job_store.add_job(file_path, relative_path)
+        # Track that this came from completed folder
+        job.source_folder = 'completed'
+        # Apply default web search and TMDB tool settings from config
+        job.enable_web_search = self.config_manager.get('ENABLE_WEB_SEARCH', False)
+        job.enable_tmdb_tool = self.config_manager.get('ENABLE_TMDB_TOOL', False)
+        
+        if existing_group_job and existing_group_job.group_id:
+            # Add this job to the existing group
+            job.group_id = existing_group_job.group_id
+            logger.info(f"Created job {job.job_id} for {relative_path} - added to group {job.group_id}")
+        elif existing_group_job:
+            # Create a new group for both files
+            group_id = str(uuid.uuid4())
+            existing_group_job.group_id = group_id
+            existing_group_job.is_group_primary = True
+            job.group_id = group_id
+            logger.info(f"Created job {job.job_id} for {relative_path} - created group {group_id} with {existing_group_job.job_id}")
         else:
-            # File arrived early, hold it in completed folder until AI processing is done
-            logger.info(f"Job {job.job_id} file arrived early (status: {job.status.value}), holding in completed folder until AI processing completes")
-            # The queue worker will check for this and organize when ready
+            # Single file, mark as primary
+            job.is_group_primary = True
+            logger.info(f"Created job {job.job_id} for {relative_path} - added to queue (web_search={job.enable_web_search}, tmdb_tool={job.enable_tmdb_tool})")
+        
+        # Job is now in queue and will be processed by queue worker
 
     def _organize_file(self, job, file_path: str):
         # Safety check: don't organize if already completed
@@ -584,6 +648,40 @@ class BackendOrchestrator:
                 error_message=str(e)
             )
 
+    def _move_uploads_to_completed(self, job):
+        """Move a file from uploads folder to completed folder after AI processing."""
+        try:
+            uploads_path = self.config_manager.get('UPLOADS_PATH')
+            completed_path = self.config_manager.get('COMPLETED_PATH')
+            
+            # Source file path (in uploads folder)
+            source_file = os.path.join(uploads_path, job.relative_path)
+            
+            if not os.path.exists(source_file):
+                logger.warning(f"Source file not found for job {job.job_id}: {source_file}")
+                return
+            
+            # Destination path (in completed folder, maintaining relative path)
+            dest_file = os.path.join(completed_path, job.relative_path)
+            dest_dir = os.path.dirname(dest_file)
+            
+            # Create destination directory if needed
+            os.makedirs(dest_dir, exist_ok=True)
+            
+            # Move the file
+            shutil.move(source_file, dest_file)
+            logger.info(f"Moved file from uploads to completed: {source_file} -> {dest_file}")
+            
+            # Update job to track that file is now in completed folder
+            job.completed_file_path = dest_file
+            job.original_path = dest_file
+            
+            # Clean up empty directories in uploads folder
+            self._cleanup_empty_directories(uploads_path)
+            
+        except Exception as e:
+            logger.error(f"Error moving file from uploads to completed for job {job.job_id}: {type(e).__name__}: {e}", exc_info=True)
+
     def _on_config_change(self, old_config, new_config):
         logger.info("Configuration changed, updating watchers...")
         logger.debug(f"Old config keys: {list(old_config.keys())}")
@@ -604,6 +702,14 @@ class BackendOrchestrator:
                 self.completed_watcher.handler.update_base_path(new_completed_path)
                 self.completed_watcher.restart(new_completed_path)
                 logger.debug("Completed watcher restarted with new path")
+        
+        if old_config.get('UPLOADS_PATH') != new_config.get('UPLOADS_PATH'):
+            new_uploads_path = new_config.get('UPLOADS_PATH')
+            logger.info(f"Uploads path changed: {old_config.get('UPLOADS_PATH')} -> {new_uploads_path}")
+            if self.uploads_watcher:
+                self.uploads_watcher.handler.update_base_path(new_uploads_path)
+                self.uploads_watcher.restart(new_uploads_path)
+                logger.debug("Uploads watcher restarted with new path")
 
     def manual_edit_job(self, job_id: str, new_name: str, new_path: Optional[str] = None):
         logger.info(f"Manual edit requested for job {job_id}")
@@ -652,9 +758,10 @@ class BackendOrchestrator:
         return True
 
     def _check_and_remove_missing_files(self):
-        """Check if files exist in downloading or completed folders, remove jobs for missing files after 5 seconds."""
+        """Check if files exist in downloading, uploads, or completed folders, remove jobs for missing files after 5 seconds."""
         downloading_path = self.config_manager.get('DOWNLOADING_PATH')
         completed_path = self.config_manager.get('COMPLETED_PATH')
+        uploads_path = self.config_manager.get('UPLOADS_PATH')
         
         # Get all jobs that are not yet completed
         active_jobs = [
@@ -663,12 +770,21 @@ class BackendOrchestrator:
         ]
         
         for job in active_jobs:
-            # Check if file exists in either downloading or completed folder
-            downloading_file_path = os.path.join(downloading_path, job.relative_path)
+            # Check if file exists based on source folder
+            file_exists = False
+            
+            if job.source_folder == 'uploads':
+                uploads_file_path = os.path.join(uploads_path, job.relative_path)
+                file_exists = os.path.exists(uploads_file_path)
+            elif job.source_folder == 'downloading':
+                downloading_file_path = os.path.join(downloading_path, job.relative_path)
+                file_exists = os.path.exists(downloading_file_path)
+            else:
+                # Check downloading folder as fallback
+                downloading_file_path = os.path.join(downloading_path, job.relative_path)
+                file_exists = os.path.exists(downloading_file_path)
             
             # Also check if there's a known completed file path
-            file_exists = os.path.exists(downloading_file_path)
-            
             if not file_exists and job.completed_file_path:
                 file_exists = os.path.exists(job.completed_file_path)
             

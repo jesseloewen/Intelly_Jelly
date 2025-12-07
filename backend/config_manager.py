@@ -50,6 +50,7 @@ class ConfigManager:
         return {
             "DOWNLOADING_PATH": "./test_folders/downloading",
             "COMPLETED_PATH": "./test_folders/completed",
+            "UPLOADS_PATH": "./test_folders/uploads",
             "LIBRARY_PATH": "./test_folders/library",
             "AI_PROVIDER": "google",
             "AI_MODEL": "gemini-2.5-flash",

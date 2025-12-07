@@ -723,6 +723,12 @@
                         </div>
                         
                         <div class="form-group">
+                            <label for="uploads-path">Uploads Path</label>
+                            <input type="text" id="uploads-path" name="UPLOADS_PATH" placeholder="./test_folders/uploads">
+                            <small>Path for uploaded files (automatically moved to completed after AI processing)</small>
+                        </div>
+                        
+                        <div class="form-group">
                             <label for="library-path">Library Path</label>
                             <input type="text" id="library-path" name="LIBRARY_PATH" placeholder="./test_folders/library">
                             <small>Path where organized files will be stored</small>
@@ -1255,6 +1261,7 @@
                 
                 document.getElementById('downloading-path').value = currentConfig.DOWNLOADING_PATH || '';
                 document.getElementById('completed-path').value = currentConfig.COMPLETED_PATH || '';
+                document.getElementById('uploads-path').value = currentConfig.UPLOADS_PATH || '';
                 document.getElementById('library-path').value = currentConfig.LIBRARY_PATH || '';
                 document.getElementById('ai-delay').value = currentConfig.AI_CALL_DELAY_SECONDS || 2;
                 document.getElementById('web-search').checked = currentConfig.ENABLE_WEB_SEARCH || false;

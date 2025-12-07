@@ -669,9 +669,74 @@ def reset_instruction_prompt():
         return jsonify({'error': 'Failed to reset instruction prompt'}), 500
 
 
+@app.route('/api/upload', methods=['POST'])
+@require_app_password
+def upload_files():
+    """Handle file and folder uploads to the uploads folder"""
+    logger.info("API: File upload request")
+    try:
+        uploads_path = config_manager.get('UPLOADS_PATH')
+        
+        if not uploads_path:
+            return jsonify({'error': 'Uploads path not configured'}), 400
+        
+        # Create uploads folder if it doesn't exist
+        os.makedirs(uploads_path, exist_ok=True)
+        
+        if 'files' not in request.files:
+            return jsonify({'error': 'No files provided'}), 400
+        
+        files = request.files.getlist('files')
+        uploaded_count = 0
+        errors = []
+        
+        for idx, file in enumerate(files):
+            if file.filename == '':
+                continue
+            
+            try:
+                # Check if there's a relative path provided (for folder uploads)
+                # Form data will have 'path_N' entries for each file in order
+                relative_path = request.form.get(f'path_{idx}', file.filename)
+                
+                # Sanitize the path to prevent directory traversal
+                relative_path = os.path.normpath(relative_path).lstrip(os.sep).lstrip('/')
+                
+                # Build destination path
+                dest_path = os.path.join(uploads_path, relative_path)
+                dest_dir = os.path.dirname(dest_path)
+                
+                # Create directory structure if needed
+                if dest_dir:
+                    os.makedirs(dest_dir, exist_ok=True)
+                
+                # Save the file
+                file.save(dest_path)
+                logger.info(f"Uploaded file: {relative_path}")
+                uploaded_count += 1
+                
+            except Exception as e:
+                error_msg = f"Error uploading {file.filename}: {str(e)}"
+                logger.error(error_msg)
+                errors.append(error_msg)
+        
+        if uploaded_count > 0:
+            message = f"Successfully uploaded {uploaded_count} file(s)"
+            if errors:
+                message += f" with {len(errors)} error(s)"
+            return jsonify({'success': True, 'message': message, 'uploaded': uploaded_count, 'errors': errors})
+        else:
+            return jsonify({'error': 'No files were uploaded', 'errors': errors}), 400
+            
+    except Exception as e:
+        logger.error(f"Error handling upload: {type(e).__name__}: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to upload files'}), 500
+
+
 if __name__ == '__main__':
     os.makedirs('./test_folders/downloading', exist_ok=True)
     os.makedirs('./test_folders/completed', exist_ok=True)
+    os.makedirs('./test_folders/uploads', exist_ok=True)
     os.makedirs('./test_folders/library', exist_ok=True)
     
     # Load saved authentication tokens

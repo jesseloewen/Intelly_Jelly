@@ -38,6 +38,7 @@ class Job:
         self.completed_file_path: Optional[str] = None
         self.group_id: Optional[str] = None  # Links files with same base name
         self.is_group_primary: bool = False  # First file in a group is primary
+        self.source_folder: Optional[str] = None  # Track which folder file came from (downloading, uploads, or completed)
 
     def to_dict(self) -> dict:
         return {
