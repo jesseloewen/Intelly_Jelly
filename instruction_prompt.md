@@ -22,7 +22,8 @@ You must return **only a single JSON array** as your response. Each object in th
 4.  **Strict & Flat Folder Structure (Media):** For **Movies, TV Shows, Music, and Books**, you must adhere *exactly* to the folder structures defined. These structures represent the **maximum allowed directory depth**. Do not create *any* additional subfolders or nested directories beyond what is explicitly listed (e.g., `Season XX`, `extras`, `Album`, etc.). If an original file is in a non-standard or nested subfolder (like `S01/Part 1` or `Danish Dub`), this extra information **must be flattened and appended to the filename** (e.g., `Movie Title (Year) - Part 1.mkv` or `TV Show (Year) - S01E01 - Danish Dub.mkv`). This rule does **not** apply to 'Software' or 'Other', which preserve their original subfolder structure.
 5.  **Filter Non-Media Files:** If a file is part of a download (e.g., in a Movie or TV Show folder) but is not the main media file, a subtitle, or a valid 'extra' as defined in the rules (e.g., it's an "extra picture" `.jpg`, `.png`, `.nfo`, or `.txt` file), it **must be categorized as `Other`**. These files should be placed in the `Other/` root directory, preserving their original filename.
 6.  **Strict Naming:** All media filenames and folders must strictly adhere to the naming conventions detailed below.
-7.  **Valid Characters:** All suggested paths and filenames must be sanitized. Remove or replace any characters that are invalid in file systems (e.g., `?`, `*`, `<`, `>`, `|`, `"`). Colons (`:`) are a common invalid character in titles and **must** be replaced with a space or " - ". 
+7.  **Sub-Names & Subtitles:** When a title has a sub-name or subtitle (e.g., "Star Trek - Starfleet Academy", "CSI - Miami"), always use " - " (space-dash-space) to separate the main title from the sub-name. This applies to both Movies and TV Shows.
+8.  **Valid Characters:** All suggested paths and filenames must be sanitized. Remove or replace any characters that are invalid in file systems (e.g., `?`, `*`, `<`, `>`, `|`, `"`). Colons (`:`) are a common invalid character in titles and **must** be replaced with a space or " - ". 
 
 -----
 
@@ -49,6 +50,11 @@ You must return **only a single JSON array** as your response. Each object in th
   {
     "original_path": "C:/Downloads/Best.Movie.Ever.2019.en_us.srt",
     "suggested_name": "Movies/Best Movie Ever (2019)/Best Movie Ever (2019).en_us.srt",
+    "confidence": 100
+  },
+  {
+    "original_path": "Downloads/Star.Trek.Starfleet.Academy.2026.mp4",
+    "suggested_name": "Movies/Star Trek - Starfleet Academy (2026)/Star Trek - Starfleet Academy (2026).mp4",
     "confidence": 100
   },
   {
@@ -92,6 +98,16 @@ You must return **only a single JSON array** as your response. Each object in th
   {
     "original_path": "torrents/ghosts.uk.s01e01.mkv",
     "suggested_name": "TV Shows/Ghosts (UK) (2019)/Season 01/Ghosts (UK) (2019) - S01E01 - Who Do You Think You Are.mkv",
+    "confidence": 100
+  },
+  {
+    "original_path": "torrents/csi.miami.s01e01.mkv",
+    "suggested_name": "TV Shows/CSI - Miami (2002)/Season 01/CSI - Miami (2002) - S01E01 - Golden Parachute.mkv",
+    "confidence": 100
+  },
+  {
+    "original_path": "torrents/star.trek.starfleet.academy.s01e02.mkv",
+    "suggested_name": "TV Shows/Star Trek - Starfleet Academy (2026)/Season 01/Star Trek - Starfleet Academy (2026) - S01E02 - The Next Adventure.mkv",
     "confidence": 100
   },
   {
