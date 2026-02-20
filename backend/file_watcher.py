@@ -29,6 +29,7 @@ class DownloadingFolderHandler(FileSystemEventHandler):
 
 
 class CompletedFolderHandler(FileSystemEventHandler):
+    """Handler for completed folder - moves files directly to library without AI processing."""
     def __init__(self, callback: Callable[[str, str], None], base_path: str):
         self.callback = callback
         self.base_path = base_path

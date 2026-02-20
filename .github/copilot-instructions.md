@@ -3,12 +3,16 @@
 ## Architecture Overview
 
 Intelly_Jelly is a Flask-based AI media organizer with a threaded job queue system. The `BackendOrchestrator` is the core coordinator that:
-- Runs file watchers for downloading/completed folders using `watchdog`
+- Runs file watchers for downloading and completed folders using `watchdog`
 - Processes jobs through a single-threaded queue worker (`_queue_worker`)
 - Groups related files (video+subtitle) by base filename AND directory
 - Moves organized files to library and logs with `FileMovementLogger`
 
-**Critical Flow**: File detected → Job created → Queued for AI → AI processing → Pending completion → File moved to library → Job auto-removed
+**Critical Flows**:
+- **Downloading folder**: File detected → Job created → AI processes and generates name/path → Job status = PENDING_COMPLETION → **File stays in downloading folder**
+- **Completed folder**: File detected → Finds matching job by filename → Uses AI-generated path → Moves to library → Job marked COMPLETED
+
+**Important**: Files in downloading folder are NEVER moved by this script. External tools (like download clients) move files from downloading to completed when ready. Only then are they organized to the library using the AI-generated path.
 
 ## Job Lifecycle & Status Transitions
 

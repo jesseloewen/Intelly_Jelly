@@ -13,7 +13,7 @@ from backend.config_manager import ConfigManager
 from backend.ai_processor import AIProcessor
 from backend.file_watcher import (
     FileWatcher, 
-    DownloadingFolderHandler, 
+    DownloadingFolderHandler,
     CompletedFolderHandler
 )
 from backend.file_movement_logger import FileMovementLogger
@@ -59,7 +59,7 @@ class BackendOrchestrator:
         self.downloading_watcher.start()
         logger.debug("Downloading folder watcher started")
         
-        completed_handler = CompletedFolderHandler(self._on_file_completed, completed_path)
+        completed_handler = CompletedFolderHandler(self._on_file_in_completed, completed_path)
         self.completed_watcher = FileWatcher(completed_path, completed_handler)
         self.completed_watcher.start()
         logger.debug("Completed folder watcher started")
@@ -146,7 +146,7 @@ class BackendOrchestrator:
 
     def _scan_existing_files(self):
         """
-        Scan both downloading and completed folders for existing files at startup and create jobs for them.
+        Scan downloading folder for AI processing and completed folder for direct library movement.
         """
         # Scan downloading folder
         downloading_path = self.config_manager.get('DOWNLOADING_PATH')
@@ -168,7 +168,7 @@ class BackendOrchestrator:
         else:
             logger.warning(f"Downloading folder does not exist: {downloading_path}")
         
-        # Scan completed folder
+        # Scan completed folder for files to move directly to library
         completed_path = self.config_manager.get('COMPLETED_PATH')
         if os.path.exists(completed_path):
             logger.info(f"Scanning for existing files in: {completed_path}")
@@ -178,7 +178,7 @@ class BackendOrchestrator:
                 for file in files:
                     file_path = os.path.join(root, file)
                     relative_path = os.path.relpath(file_path, completed_path)
-                    self._on_file_completed(file_path, relative_path)
+                    self._on_file_in_completed(file_path, relative_path)
                     completed_count += 1
             
             if completed_count > 0:
@@ -355,11 +355,8 @@ class BackendOrchestrator:
                         priority=False if is_priority else job.priority
                     )
                     logger.info(f"Job {job.job_id} completed: {job.relative_path} -> {suggested_name} (confidence: {confidence}%)")
-                    
-                    # If file is already waiting in completed folder, organize it now
-                    if job.completed_file_path and os.path.exists(job.completed_file_path):
-                        logger.info(f"Job {job.job_id} file already in completed folder, organizing now")
-                        self._organize_file(job, job.completed_file_path)
+                
+                logger.info(f"All grouped files will remain in downloading folder until moved to completed folder for organization")
             else:
                 logger.warning(f"AI results mismatch for grouped jobs: expected {len(jobs)}, got {len(results) if results else 0}")
                 # Mark all as failed
@@ -418,11 +415,7 @@ class BackendOrchestrator:
                     priority=False if is_priority else job.priority
                 )
                 logger.info(f"Job {job.job_id} completed: {job.relative_path} -> {suggested_name} (confidence: {confidence}%)")
-                
-                # If file is already waiting in completed folder, organize it now
-                if job.completed_file_path and os.path.exists(job.completed_file_path):
-                    logger.info(f"Job {job.job_id} file already in completed folder, organizing now")
-                    self._organize_file(job, job.completed_file_path)
+                logger.info(f"File will remain in downloading folder until moved to completed folder for organization")
             else:
                 logger.warning(f"No AI result returned for job {job.job_id}")
                 # Increment retry count if this is a retry attempt
@@ -453,51 +446,7 @@ class BackendOrchestrator:
                 priority=False if is_priority else job.priority
             )
 
-    def _on_file_completed(self, file_path: str, relative_path: str):
-        logger.info(f"File detected in completed folder: {relative_path}")
-        logger.debug(f"Full path: {file_path}")
-        
-        # Check if job already exists for this file
-        existing_job = self.job_store.get_job_by_path(file_path)
-        if existing_job:
-            logger.info(f"Job already exists for {relative_path} (job_id: {existing_job.job_id})") 
-            return
-        
-        # No existing job, create a new one (same logic as downloading folder)
-        file_dir = os.path.dirname(relative_path)
-        base_name = os.path.splitext(os.path.basename(relative_path))[0]
-        
-        # Find existing job with same base name in the same directory
-        existing_group_job = None
-        for job in self.job_store.get_all_jobs():
-            job_dir = os.path.dirname(job.relative_path)
-            job_base_name = os.path.splitext(os.path.basename(job.relative_path))[0]
-            if job_base_name == base_name and job_dir == file_dir:
-                existing_group_job = job
-                break
-        
-        job = self.job_store.add_job(file_path, relative_path)
-        # Apply default web search and TMDB tool settings from config
-        job.enable_web_search = self.config_manager.get('ENABLE_WEB_SEARCH', False)
-        job.enable_tmdb_tool = self.config_manager.get('ENABLE_TMDB_TOOL', False)
-        
-        if existing_group_job and existing_group_job.group_id:
-            # Add this job to the existing group
-            job.group_id = existing_group_job.group_id
-            logger.info(f"Created job {job.job_id} for {relative_path} - added to group {job.group_id}")
-        elif existing_group_job:
-            # Create a new group for both files
-            group_id = str(uuid.uuid4())
-            existing_group_job.group_id = group_id
-            existing_group_job.is_group_primary = True
-            job.group_id = group_id
-            logger.info(f"Created job {job.job_id} for {relative_path} - created group {group_id} with {existing_group_job.job_id}")
-        else:
-            # Single file, mark as primary
-            job.is_group_primary = True
-            logger.info(f"Created job {job.job_id} for {relative_path} - added to queue (web_search={job.enable_web_search}, tmdb_tool={job.enable_tmdb_tool})")
-        
-        # Job is now in queue and will be processed by queue worker
+
 
     def _organize_file(self, job, file_path: str):
         # Safety check: don't organize if already completed
@@ -602,6 +551,50 @@ class BackendOrchestrator:
                 JobStatus.FAILED,
                 error_message=str(e)
             )
+
+    def _on_file_in_completed(self, file_path: str, relative_path: str):
+        """
+        Handle files detected in completed folder - find existing job and use AI-generated path to organize.
+        If no job exists with AI-generated name, skip the file.
+        """
+        logger.info(f"File detected in completed folder: {relative_path}")
+        logger.debug(f"Full path: {file_path}")
+        
+        # Find existing job by matching the filename (basename)
+        filename = os.path.basename(file_path)
+        matching_job = None
+        
+        for job in self.job_store.get_all_jobs():
+            # Match by basename of original_path
+            job_filename = os.path.basename(job.original_path)
+            if job_filename == filename:
+                matching_job = job
+                logger.debug(f"Found matching job {job.job_id} for file {filename}")
+                break
+        
+        if not matching_job:
+            logger.warning(f"No matching job found for file in completed folder: {filename}")
+            logger.warning(f"File will not be organized. Create a job in downloading folder first.")
+            return
+        
+        if matching_job.status != JobStatus.PENDING_COMPLETION:
+            logger.warning(f"Job {matching_job.job_id} is not in PENDING_COMPLETION status (current: {matching_job.status.value})")
+            logger.warning(f"File will not be organized. Job must have AI-generated name first.")
+            return
+        
+        if not matching_job.ai_determined_name:
+            logger.warning(f"Job {matching_job.job_id} has no AI-generated name")
+            logger.warning(f"File will not be organized. Run AI processing first.")
+            return
+        
+        # Update job's original_path to reflect new location in completed folder
+        matching_job.original_path = file_path
+        
+        logger.info(f"Using AI-generated path from job {matching_job.job_id} to organize file")
+        logger.info(f"Target: {matching_job.ai_determined_name}")
+        
+        # Use the existing _organize_file method with AI-generated path
+        self._organize_file(matching_job, file_path)
 
     def _on_config_change(self, old_config, new_config):
         logger.info("Configuration changed, updating watchers...")
