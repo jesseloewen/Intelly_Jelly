@@ -742,11 +742,12 @@
                         <div class="form-group">
                             <label for="ai-provider">AI Provider</label>
                             <select id="ai-provider" name="AI_PROVIDER" onchange="handleProviderChange()">
-                                <option value="google">Google AI (recommended)</option>
+                                <option value="openrouter">OpenRouter (recommended)</option>
+                                <option value="google">Google AI</option>
                                 <option value="openai">OpenAI</option>
                                 <option value="ollama">Ollama (local)</option>
                             </select>
-                            <small>Select which AI provider to use. <strong>Note:</strong> gemini-2.5-flash with web search enabled is the most tested configuration.</small>
+                            <small>Select which AI provider to use. <strong>Note:</strong> OpenRouter with deepseek/deepseek-chat is the most tested configuration.</small>
                         </div>
                         
                         <div class="form-group" id="google-api-key-group">
@@ -767,6 +768,16 @@
                                 <button type="button" id="delete-openai-key" class="delete-key-btn" style="display: none;" onclick="deleteApiKey('openai')">Delete</button>
                             </div>
                             <small>Required for OpenAI-powered file organization</small>
+                        </div>
+                        
+                        <div class="form-group" id="openrouter-api-key-group" style="display: block;">
+                            <label for="openrouter-api-key">OpenRouter API Key</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="text" id="openrouter-api-key" name="OPENROUTER_API_KEY" placeholder="Enter OpenRouter API Key" style="flex: 1;">
+                                <button type="button" id="reveal-openrouter-key" class="reveal-key-btn" style="display: none;" onclick="toggleRevealKey('openrouter')">👁️</button>
+                                <button type="button" id="delete-openrouter-key" class="delete-key-btn" style="display: none;" onclick="deleteApiKey('openrouter')">Delete</button>
+                            </div>
+                            <small>Required for OpenRouter-powered file organization (routes to DeepSeek, Google, OpenAI, and more)</small>
                         </div>
                         
                         <div class="form-group" id="ollama-base-url-group" style="display: none;">
@@ -859,6 +870,34 @@
                             </div>
                         </div>
                         
+                        <!-- Collapsible Advanced OpenRouter Parameters -->
+                        <div class="settings-section" id="openrouter-params-section" style="display: block; margin-bottom: 20px;">
+                            <div class="section-header" onclick="toggleSection('openrouter-params')">
+                                <h3 style="font-size: 14px; font-weight: 600;">Advanced Model Parameters</h3>
+                                <span class="section-toggle" id="openrouter-params-toggle">▼</span>
+                            </div>
+                            <div class="section-content collapsed" id="openrouter-params-content">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                    <div class="form-group" style="margin-bottom: 10px;">
+                                        <label for="openrouter-temperature" style="font-size: 13px; font-weight: normal;">Temperature</label>
+                                        <input type="number" id="openrouter-temperature" name="OPENROUTER_TEMPERATURE" min="0" max="2" step="0.1" placeholder="0.1">
+                                        <small style="font-size: 11px;">Creativity level (0-2, default: 0.1)</small>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 10px;">
+                                        <label for="openrouter-max-tokens" style="font-size: 13px; font-weight: normal;">Max Tokens</label>
+                                        <input type="number" id="openrouter-max-tokens" name="OPENROUTER_MAX_TOKENS" min="128" max="8192" step="128" placeholder="4096">
+                                        <small style="font-size: 11px;">Maximum response length (default: 4096)</small>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 10px;">
+                                        <label for="openrouter-top-p" style="font-size: 13px; font-weight: normal;">Top P</label>
+                                        <input type="number" id="openrouter-top-p" name="OPENROUTER_TOP_P" min="0" max="1" step="0.05" placeholder="1">
+                                        <small style="font-size: 11px;">Nucleus sampling (default: 1)</small>
+                                    </div>
+                                </div>
+                                <small style="margin-top: 10px; display: block; color: var(--text-secondary);">Fine-tune OpenRouter model behavior by adjusting these parameters</small>
+                            </div>
+                        </div>
+                        
                         <!-- Collapsible Advanced Ollama Parameters -->
                         <div class="settings-section" id="ollama-params-section" style="display: none; margin-bottom: 20px;">
                             <div class="section-header" onclick="toggleSection('ollama-params')">
@@ -917,6 +956,14 @@
                                 <label for="tmdb-tool">Enable TMDB Tool</label>
                             </div>
                             <small>Allow AI to query The Movie Database for accurate movie/TV show information (all providers)</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="openlibrary-tool" name="ENABLE_OPENLIBRARY_TOOL">
+                                <label for="openlibrary-tool">Enable Open Library Tool</label>
+                            </div>
+                            <small>Allow AI to query Open Library for accurate book/audiobook titles, authors, and publication metadata (all providers, no API key needed)</small>
                         </div>
                         
                         <div class="form-group" id="tmdb-api-key-group" style="display: none;">
@@ -1071,7 +1118,8 @@
         let currentConfig = {};
         let providerModels = {
             google: null,
-            openai: null
+            openai: null,
+            openrouter: null
         };
         
         // Section toggle functionality
@@ -1092,7 +1140,7 @@
         
         // Restore section states from localStorage (default to collapsed)
         function restoreSectionStates() {
-            const sections = ['folder-paths', 'ai-config', 'jellyfin', 'security', 'google-params', 'openai-params', 'ollama-params'];
+            const sections = ['folder-paths', 'ai-config', 'jellyfin', 'security', 'google-params', 'openai-params', 'openrouter-params', 'ollama-params'];
             sections.forEach(sectionId => {
                 const state = localStorage.getItem('section-' + sectionId);
                 const content = document.getElementById(sectionId + '-content');
@@ -1125,6 +1173,11 @@
                 document.getElementById('delete-openai-key').style.display = 'none';
                 document.getElementById('reveal-openai-key').style.display = 'none';
                 delete document.getElementById('openai-api-key').dataset.fullKey;
+            } else if (keyType === 'openrouter') {
+                document.getElementById('openrouter-api-key').value = '';
+                document.getElementById('delete-openrouter-key').style.display = 'none';
+                document.getElementById('reveal-openrouter-key').style.display = 'none';
+                delete document.getElementById('openrouter-api-key').dataset.fullKey;
             } else if (keyType === 'jellyfin') {
                 document.getElementById('jellyfin-api-key').value = '';
                 document.getElementById('delete-jellyfin-key').style.display = 'none';
@@ -1162,6 +1215,7 @@
             const provider = document.getElementById('ai-provider').value;
             const googleKeyGroup = document.getElementById('google-api-key-group');
             const openaiKeyGroup = document.getElementById('openai-api-key-group');
+            const openrouterKeyGroup = document.getElementById('openrouter-api-key-group');
             const ollamaBaseUrlGroup = document.getElementById('ollama-base-url-group');
             const ollamaParamsSection = document.getElementById('ollama-params-section');
             const refreshOllamaBtn = document.getElementById('refresh-ollama-models-btn');
@@ -1172,25 +1226,47 @@
             // Switch API key/URL display based on provider
             const googleParamsSection = document.getElementById('google-params-section');
             const openaiParamsSection = document.getElementById('openai-params-section');
+            const openrouterParamsSection = document.getElementById('openrouter-params-section');
             
             if (provider === 'openai') {
                 googleKeyGroup.style.display = 'none';
                 openaiKeyGroup.style.display = 'block';
+                openrouterKeyGroup.style.display = 'none';
                 ollamaBaseUrlGroup.style.display = 'none';
                 googleParamsSection.style.display = 'none';
                 openaiParamsSection.style.display = 'block';
+                openrouterParamsSection.style.display = 'none';
                 ollamaParamsSection.style.display = 'none';
                 refreshOllamaBtn.style.display = 'none';
                 // Enable web search for OpenAI
                 webSearchCheckbox.disabled = false;
                 webSearchLabel.style.opacity = '1';
                 webSearchLabel.style.cursor = 'pointer';
+            } else if (provider === 'openrouter') {
+                googleKeyGroup.style.display = 'none';
+                openaiKeyGroup.style.display = 'none';
+                openrouterKeyGroup.style.display = 'block';
+                ollamaBaseUrlGroup.style.display = 'none';
+                googleParamsSection.style.display = 'none';
+                openaiParamsSection.style.display = 'none';
+                openrouterParamsSection.style.display = 'block';
+                ollamaParamsSection.style.display = 'none';
+                refreshOllamaBtn.style.display = 'none';
+                // Disable web search for OpenRouter (not natively supported)
+                webSearchCheckbox.disabled = true;
+                webSearchCheckbox.checked = false;
+                webSearchLabel.style.opacity = '0.5';
+                webSearchLabel.style.cursor = 'not-allowed';
+                webSearchDescription.innerHTML = 'Web search is not supported with OpenRouter (use TMDB tool for metadata lookup)';
+                webSearchDescription.style.color = '#999';
             } else if (provider === 'ollama') {
                 googleKeyGroup.style.display = 'none';
                 openaiKeyGroup.style.display = 'none';
+                openrouterKeyGroup.style.display = 'none';
                 ollamaBaseUrlGroup.style.display = 'block';
                 googleParamsSection.style.display = 'none';
                 openaiParamsSection.style.display = 'none';
+                openrouterParamsSection.style.display = 'none';
                 ollamaParamsSection.style.display = 'block';
                 refreshOllamaBtn.style.display = 'inline-block';
                 // Disable web search for Ollama
@@ -1203,9 +1279,11 @@
             } else {
                 googleKeyGroup.style.display = 'block';
                 openaiKeyGroup.style.display = 'none';
+                openrouterKeyGroup.style.display = 'none';
                 ollamaBaseUrlGroup.style.display = 'none';
                 googleParamsSection.style.display = 'block';
                 openaiParamsSection.style.display = 'none';
+                openrouterParamsSection.style.display = 'none';
                 ollamaParamsSection.style.display = 'none';
                 refreshOllamaBtn.style.display = 'none';
                 // Enable web search for Google AI
@@ -1265,6 +1343,7 @@
                 // Store provider-specific models
                 providerModels.google = currentConfig.GOOGLE_MODEL || currentConfig.AI_MODEL || 'gemini-2.5-flash';
                 providerModels.openai = currentConfig.OPENAI_MODEL || 'gpt-5-mini';
+                providerModels.openrouter = currentConfig.OPENROUTER_MODEL || 'deepseek/deepseek-chat';
                 providerModels.ollama = currentConfig.OLLAMA_MODEL || 'llama3.2';
                 
                 // Handle AI provider
@@ -1284,6 +1363,11 @@
                 document.getElementById('openai-frequency-penalty').value = currentConfig.OPENAI_FREQUENCY_PENALTY || 0;
                 document.getElementById('openai-presence-penalty').value = currentConfig.OPENAI_PRESENCE_PENALTY || 0;
                 
+                // Handle OpenRouter parameters
+                document.getElementById('openrouter-temperature').value = currentConfig.OPENROUTER_TEMPERATURE || 0.1;
+                document.getElementById('openrouter-max-tokens').value = currentConfig.OPENROUTER_MAX_TOKENS || 4096;
+                document.getElementById('openrouter-top-p').value = currentConfig.OPENROUTER_TOP_P || 1;
+                
                 // Handle Ollama base URL and parameters
                 document.getElementById('ollama-base-url').value = currentConfig.OLLAMA_BASE_URL || 'http://localhost:11434';
                 document.getElementById('ollama-temperature').value = currentConfig.OLLAMA_TEMPERATURE || 0.1;
@@ -1301,15 +1385,34 @@
                 if (provider === 'openai') {
                     document.getElementById('google-api-key-group').style.display = 'none';
                     document.getElementById('openai-api-key-group').style.display = 'block';
+                    document.getElementById('openrouter-api-key-group').style.display = 'none';
                     document.getElementById('ollama-base-url-group').style.display = 'none';
                     document.getElementById('google-params-section').style.display = 'none';
                     document.getElementById('openai-params-section').style.display = 'block';
+                    document.getElementById('openrouter-params-section').style.display = 'none';
                     document.getElementById('ollama-params-section').style.display = 'none';
                     refreshOllamaBtn.style.display = 'none';
                     // Enable web search for OpenAI
                     webSearchCheckbox.disabled = false;
                     webSearchLabel.style.opacity = '1';
                     webSearchLabel.style.cursor = 'pointer';
+                } else if (provider === 'openrouter') {
+                    document.getElementById('google-api-key-group').style.display = 'none';
+                    document.getElementById('openai-api-key-group').style.display = 'none';
+                    document.getElementById('openrouter-api-key-group').style.display = 'block';
+                    document.getElementById('ollama-base-url-group').style.display = 'none';
+                    document.getElementById('google-params-section').style.display = 'none';
+                    document.getElementById('openai-params-section').style.display = 'none';
+                    document.getElementById('openrouter-params-section').style.display = 'block';
+                    document.getElementById('ollama-params-section').style.display = 'none';
+                    refreshOllamaBtn.style.display = 'none';
+                    // Disable web search for OpenRouter
+                    webSearchCheckbox.disabled = true;
+                    webSearchCheckbox.checked = false;
+                    webSearchLabel.style.opacity = '0.5';
+                    webSearchLabel.style.cursor = 'not-allowed';
+                    webSearchDescription.innerHTML = 'Web search is not supported with OpenRouter (use TMDB tool for metadata lookup)';
+                    webSearchDescription.style.color = '#999';
                 } else if (provider === 'ollama') {
                     document.getElementById('google-api-key-group').style.display = 'none';
                     document.getElementById('openai-api-key-group').style.display = 'none';
@@ -1328,9 +1431,11 @@
                 } else {
                     document.getElementById('google-api-key-group').style.display = 'block';
                     document.getElementById('openai-api-key-group').style.display = 'none';
+                    document.getElementById('openrouter-api-key-group').style.display = 'none';
                     document.getElementById('ollama-base-url-group').style.display = 'none';
                     document.getElementById('google-params-section').style.display = 'block';
                     document.getElementById('openai-params-section').style.display = 'none';
+                    document.getElementById('openrouter-params-section').style.display = 'none';
                     document.getElementById('ollama-params-section').style.display = 'none';
                     refreshOllamaBtn.style.display = 'none';
                     // Enable web search for Google AI
@@ -1342,6 +1447,7 @@
                 // Handle API keys with masking
                 const googleKey = currentConfig.GOOGLE_API_KEY || '';
                 const openaiKey = currentConfig.OPENAI_API_KEY || '';
+                const openrouterKey = currentConfig.OPENROUTER_API_KEY || '';
                 const jellyfinKey = currentConfig.JELLYFIN_API_KEY || '';
                 const tmdbKey = currentConfig.TMDB_API_KEY || '';
                 
@@ -1361,6 +1467,15 @@
                     document.getElementById('reveal-openai-key').textContent = '👁️';
                     document.getElementById('reveal-openai-key').title = 'Show key';
                     document.getElementById('delete-openai-key').style.display = 'inline-block';
+                }
+                
+                if (openrouterKey) {
+                    document.getElementById('openrouter-api-key').value = maskApiKey(openrouterKey);
+                    document.getElementById('openrouter-api-key').dataset.fullKey = openrouterKey;
+                    document.getElementById('reveal-openrouter-key').style.display = 'inline-block';
+                    document.getElementById('reveal-openrouter-key').textContent = '👁️';
+                    document.getElementById('reveal-openrouter-key').title = 'Show key';
+                    document.getElementById('delete-openrouter-key').style.display = 'inline-block';
                 }
                 
                 if (jellyfinKey) {
@@ -1386,6 +1501,10 @@
                 const tmdbApiKeyGroup = document.getElementById('tmdb-api-key-group');
                 tmdbToolCheckbox.checked = currentConfig.ENABLE_TMDB_TOOL || false;
                 tmdbApiKeyGroup.style.display = tmdbToolCheckbox.checked ? 'block' : 'none';
+                
+                // Handle Open Library tool checkbox
+                const openlibraryToolCheckbox = document.getElementById('openlibrary-tool');
+                openlibraryToolCheckbox.checked = currentConfig.ENABLE_OPENLIBRARY_TOOL || false;
                 
                 await loadModels();
                 restoreSectionStates();
@@ -1433,6 +1552,28 @@
                                 } else {
                                     option.textContent = model;
                                 }
+                            } else if (provider === 'openrouter') {
+                                if (model === 'deepseek/deepseek-chat') {
+                                    option.textContent = model + ' (DeepSeek V4 Pro, recommended)';
+                                } else if (model === 'deepseek/deepseek-r1') {
+                                    option.textContent = model + ' (DeepSeek R1 reasoning)';
+                                } else if (model === 'google/gemini-2.5-flash') {
+                                    option.textContent = model + ' (via OpenRouter)';
+                                } else if (model === 'google/gemini-2.5-pro') {
+                                    option.textContent = model + ' (via OpenRouter)';
+                                } else if (model === 'openai/gpt-5') {
+                                    option.textContent = model + ' (via OpenRouter)';
+                                } else if (model === 'openai/gpt-5-mini') {
+                                    option.textContent = model + ' (via OpenRouter)';
+                                } else if (model === 'openai/gpt-5-nano') {
+                                    option.textContent = model + ' (via OpenRouter)';
+                                } else if (model === 'openai/o4-mini') {
+                                    option.textContent = model + ' (via OpenRouter)';
+                                } else if (model === 'custom') {
+                                    option.textContent = 'Custom model...';
+                                } else {
+                                    option.textContent = model;
+                                }
                             } else if (provider === 'openai') {
                                 if (model === 'gpt-5-mini') {
                                     option.textContent = model + ' (recommended)';
@@ -1472,9 +1613,13 @@
                             handleModelChange();
                         } else {
                             // Default to recommended model based on provider
-                            let recommendedModel = 'gemini-2.5-flash';
+                            let recommendedModel = 'deepseek/deepseek-chat';
                             if (provider === 'openai') {
                                 recommendedModel = 'gpt-5-mini';
+                            } else if (provider === 'openrouter') {
+                                recommendedModel = 'deepseek/deepseek-chat';
+                            } else if (provider === 'google') {
+                                recommendedModel = 'gemini-2.5-flash';
                             } else if (provider === 'ollama') {
                                 // For Ollama, try to find a recommended model or use the first available
                                 if (standardModels.includes('llama3.2')) {
@@ -1616,9 +1761,10 @@
             config.ENABLE_WEB_SEARCH = document.getElementById('web-search').checked;
             config.JELLYFIN_REFRESH_ENABLED = document.getElementById('jellyfin-refresh').checked;
             config.ENABLE_TMDB_TOOL = document.getElementById('tmdb-tool').checked;
+            config.ENABLE_OPENLIBRARY_TOOL = document.getElementById('openlibrary-tool').checked;
             
             for (const [key, value] of formData.entries()) {
-                if (key === 'ENABLE_WEB_SEARCH' || key === 'JELLYFIN_REFRESH_ENABLED' || key === 'ENABLE_TMDB_TOOL') {
+                if (key === 'ENABLE_WEB_SEARCH' || key === 'JELLYFIN_REFRESH_ENABLED' || key === 'ENABLE_TMDB_TOOL' || key === 'ENABLE_OPENLIBRARY_TOOL') {
                     // Skip - already handled above
                     continue;
                 } else if (key === 'AI_CALL_DELAY_SECONDS') {
@@ -1638,6 +1784,12 @@
                     const openaiInput = document.getElementById('openai-api-key');
                     config[key] = openaiInput.dataset.fullKey && value === maskApiKey(openaiInput.dataset.fullKey) 
                         ? openaiInput.dataset.fullKey 
+                        : value;
+                } else if (key === 'OPENROUTER_API_KEY') {
+                    // Use full key if it exists (not changed), otherwise use new value
+                    const openrouterInput = document.getElementById('openrouter-api-key');
+                    config[key] = openrouterInput.dataset.fullKey && value === maskApiKey(openrouterInput.dataset.fullKey) 
+                        ? openrouterInput.dataset.fullKey 
                         : value;
                 } else if (key === 'JELLYFIN_API_KEY') {
                     // Use full key if it exists (not changed), otherwise use new value
@@ -1673,6 +1825,8 @@
                         config['GOOGLE_MODEL'] = config[key];
                     } else if (provider === 'openai') {
                         config['OPENAI_MODEL'] = config[key];
+                    } else if (provider === 'openrouter') {
+                        config['OPENROUTER_MODEL'] = config[key];
                     } else if (provider === 'ollama') {
                         config['OLLAMA_MODEL'] = config[key];
                     }

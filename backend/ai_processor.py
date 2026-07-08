@@ -6,8 +6,11 @@ import time
 from typing import List, Dict, Optional
 from openai import OpenAI
 from backend.tmdb_api import TMDBClient, format_tool_response
+from backend.openlibrary_api import OpenLibraryClient, format_openlibrary_response
 
 logger = logging.getLogger(__name__)
+
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
 class AIProcessor:
@@ -15,9 +18,10 @@ class AIProcessor:
         self.config_manager = config_manager
         self.last_api_call_time = 0
         self.openai_client = None
+        self.openrouter_client = None
         self.tmdb_client = None
+        self.openlibrary_client = None
         
-        # Hardcoded model lists
         self.GOOGLE_MODELS = [
             "gemini-2.5-flash",
             "gemini-2.5-pro",
@@ -31,7 +35,17 @@ class AIProcessor:
             "custom"
         ]
         
-        # Ollama models are fetched dynamically from the server
+        self.OPENROUTER_MODELS = [
+            "deepseek/deepseek-v4-pro",
+            "deepseek/deepseek-v4-flash",
+            "google/gemini-2.5-flash",
+            "google/gemini-2.5-pro",
+            "openai/gpt-5",
+            "openai/gpt-5-mini",
+            "openai/gpt-5-nano",
+            "custom"
+        ]
+        
         self.ollama_models_cache = []
         self.ollama_models_cache_time = 0
 
@@ -52,6 +66,18 @@ class AIProcessor:
             logger.info("Initialized TMDB client")
         
         return self.tmdb_client
+    
+    def _get_openlibrary_client(self) -> Optional[OpenLibraryClient]:
+        """Get or initialize Open Library client if enabled."""
+        ol_enabled = self.config_manager.get('ENABLE_OPENLIBRARY_TOOL', False)
+        if not ol_enabled:
+            return None
+        
+        if not self.openlibrary_client:
+            self.openlibrary_client = OpenLibraryClient()
+            logger.info("Initialized Open Library client")
+        
+        return self.openlibrary_client
     
     def _get_tmdb_tool_definition_google(self) -> Optional[Dict]:
         """Get TMDB tool definition for Google AI function calling."""
@@ -108,6 +134,72 @@ class AIProcessor:
                             }
                         },
                         "required": ["tv_show_name", "season_number"]
+                    }
+                }
+            ]
+        }
+    
+    def _get_openlibrary_tool_definition_google(self) -> Optional[Dict]:
+        """Get Open Library tool definitions for Google AI function calling."""
+        if not self._get_openlibrary_client():
+            return None
+        
+        return {
+            "function_declarations": [
+                {
+                    "name": "search_book",
+                    "description": "Search for a book in Open Library to get accurate title, author, and first publish year. Use this when you need to verify book/ebook/audiobook information or find author names and publication years.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "book_name": {
+                                "type": "string",
+                                "description": "The title of the book to search for"
+                            }
+                        },
+                        "required": ["book_name"]
+                    }
+                },
+                {
+                    "name": "search_audiobook",
+                    "description": "Search for an audiobook in Open Library to get accurate title, author, and publication metadata. Use this when the file appears to be an audiobook (audio files in a book-like structure).",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "book_name": {
+                                "type": "string",
+                                "description": "The title of the audiobook to search for"
+                            }
+                        },
+                        "required": ["book_name"]
+                    }
+                },
+                {
+                    "name": "get_book_chapters",
+                    "description": "Get detailed book information including description and subjects from Open Library. Use this to verify book title, author, and get contextual metadata for proper naming.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "book_name": {
+                                "type": "string",
+                                "description": "The title of the book to get details for"
+                            }
+                        },
+                        "required": ["book_name"]
+                    }
+                },
+                {
+                    "name": "search_author",
+                    "description": "Search for an author in Open Library to get their name, birth date, and notable works. Use this when you need to verify an author's name for book organization.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "author_name": {
+                                "type": "string",
+                                "description": "The name of the author to search for"
+                            }
+                        },
+                        "required": ["author_name"]
                     }
                 }
             ]
@@ -180,22 +272,102 @@ class AIProcessor:
             }
         ]
     
+    def _get_openlibrary_tools_for_openai(self) -> List[Dict]:
+        """Get Open Library tool definitions for OpenAI/OpenRouter function calling."""
+        if not self._get_openlibrary_client():
+            return []
+        
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_book",
+                    "description": "Search for a book in Open Library to get accurate title, author, and first publish year. Use this when you need to verify book/ebook/audiobook information or find author names and publication years.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "book_name": {
+                                "type": "string",
+                                "description": "The title of the book to search for"
+                            }
+                        },
+                        "required": ["book_name"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_audiobook",
+                    "description": "Search for an audiobook in Open Library to get accurate title, author, and publication metadata. Use this when the file appears to be an audiobook (audio files in a book-like structure).",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "book_name": {
+                                "type": "string",
+                                "description": "The title of the audiobook to search for"
+                            }
+                        },
+                        "required": ["book_name"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_book_chapters",
+                    "description": "Get detailed book information including description and subjects from Open Library. Use this to verify book title, author, and get contextual metadata for proper naming.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "book_name": {
+                                "type": "string",
+                                "description": "The title of the book to get details for"
+                            }
+                        },
+                        "required": ["book_name"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_author",
+                    "description": "Search for an author in Open Library to get their name, birth date, and notable works. Use this when you need to verify an author's name for book organization.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "author_name": {
+                                "type": "string",
+                                "description": "The name of the author to search for"
+                            }
+                        },
+                        "required": ["author_name"]
+                    }
+                }
+            }
+        ]
+    
     def _execute_tmdb_function(self, function_name: str, args: Dict) -> str:
-        """Execute a TMDB function call and return formatted response."""
+        """Execute a TMDB or Open Library function call and return formatted response."""
         client = self._get_tmdb_client()
-        if not client:
-            return "TMDB tool is not available"
         
         try:
             if function_name == "search_movie":
+                if not client:
+                    return "TMDB tool is not available"
                 result = client.search_movie(args.get("movie_name", ""))
                 return format_tool_response(result, "movie")
             
             elif function_name == "search_tv_show":
+                if not client:
+                    return "TMDB tool is not available"
                 result = client.search_tv_show(args.get("tv_show_name", ""))
                 return format_tool_response(result, "tv")
             
             elif function_name == "get_tv_episode_info":
+                if not client:
+                    return "TMDB tool is not available"
                 result = client.get_tv_episode_info(
                     args.get("tv_show_name", ""),
                     args.get("season_number", 1),
@@ -203,12 +375,64 @@ class AIProcessor:
                 )
                 return format_tool_response(result, "episode")
             
+            elif function_name in ("search_book", "search_audiobook", "get_book_chapters", "search_author"):
+                ol_client = self._get_openlibrary_client()
+                if not ol_client:
+                    return "Open Library tool is not available"
+                
+                if function_name == "search_book":
+                    result = ol_client.search_book(args.get("book_name", ""))
+                    return format_openlibrary_response(result, "book")
+                
+                elif function_name == "search_audiobook":
+                    result = ol_client.search_audiobook(args.get("book_name", ""))
+                    return format_openlibrary_response(result, "audiobook")
+                
+                elif function_name == "get_book_chapters":
+                    result = ol_client.get_book_chapters(args.get("book_name", ""))
+                    return format_openlibrary_response(result, "chapters")
+                
+                elif function_name == "search_author":
+                    result = ol_client.search_author(args.get("author_name", ""))
+                    return format_openlibrary_response(result, "author")
+            
             else:
                 return f"Unknown function: {function_name}"
         
         except Exception as e:
-            logger.error(f"Error executing TMDB function {function_name}: {e}")
+            logger.error(f"Error executing function {function_name}: {e}")
             return f"Error: {str(e)}"
+    
+    @staticmethod
+    def _extract_json(text: str) -> str:
+        """Extract valid JSON array/object from text that may contain surrounding commentary.
+        
+        Uses json.JSONDecoder.raw_decode() which correctly handles brackets inside
+        JSON strings and returns the position where valid JSON ends.
+        """
+        text = text.strip()
+        if text.startswith('```json'):
+            text = text[7:]
+        elif text.startswith('```'):
+            text = text[3:]
+        if text.endswith('```'):
+            text = text[:-3]
+        text = text.strip()
+        
+        if not text:
+            return text
+        
+        # Find the first [ or {
+        decoder = json.JSONDecoder()
+        for i, ch in enumerate(text):
+            if ch in ('[', '{'):
+                try:
+                    obj, end = decoder.raw_decode(text[i:])
+                    return text[i:i + end]
+                except json.JSONDecodeError:
+                    continue
+        
+        return text
     
     def _get_instructions(self) -> str:
         # Check for custom instructions first, fall back to base instructions
@@ -246,20 +470,20 @@ class AIProcessor:
         
         return prompt
 
-    def process_single(self, file_path: str, custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False) -> Optional[Dict]:
-        """Process a single file using configured AI with optional web search and TMDB tool."""
+    def process_single(self, file_path: str, custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False) -> Optional[Dict]:
+        """Process a single file using configured AI with optional web search and tools."""
         logger.info(f"Starting AI processing for file: {file_path}")
-        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}")
+        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}")
         
         # Process as single-item batch and return first result
-        results = self.process_batch([file_path], custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool)
+        results = self.process_batch([file_path], custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool)
         return results[0] if results else None
     
-    def process_batch(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False) -> List[Dict]:
-        """Process files using configured AI provider with optional web search and TMDB tool."""
+    def process_batch(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False) -> List[Dict]:
+        """Process files using configured AI provider with optional web search and tools."""
         logger.info(f"Starting AI processing for {len(file_paths)} file(s)")
         logger.debug(f"Files to process: {file_paths}")
-        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}")
+        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}")
         
         # Override enable_tmdb_tool based on actual config state (if not explicitly disabled)
         if enable_tmdb_tool:
@@ -268,18 +492,26 @@ class AIProcessor:
                 logger.warning("TMDB tool requested but not enabled in config, disabling for this request")
                 enable_tmdb_tool = False
         
+        if enable_openlibrary_tool:
+            ol_enabled_in_config = self.config_manager.get('ENABLE_OPENLIBRARY_TOOL', False)
+            if not ol_enabled_in_config:
+                logger.warning("Open Library tool requested but not enabled in config, disabling for this request")
+                enable_openlibrary_tool = False
+        
         provider = self.config_manager.get('AI_PROVIDER', 'google')
         logger.info(f"Using AI provider: {provider}")
         
         if provider == 'openai':
-            return self._process_batch_openai(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool)
+            return self._process_batch_openai(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool)
+        elif provider == 'openrouter':
+            return self._process_batch_openrouter(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool)
         elif provider == 'ollama':
-            return self._process_batch_ollama(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool)
+            return self._process_batch_ollama(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool)
         else:
-            return self._process_batch_google(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool)
+            return self._process_batch_google(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool)
     
-    def _process_batch_google(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False) -> List[Dict]:
-        """Process files using Google AI with optional web search and TMDB tool."""
+    def _process_batch_google(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False) -> List[Dict]:
+        """Process files using Google AI with optional web search and tools."""
         api_key = self.config_manager.get('GOOGLE_API_KEY', '')
         if not api_key:
             logger.error("GOOGLE_API_KEY not found in configuration")
@@ -319,6 +551,11 @@ class AIProcessor:
             tmdb_tool = self._get_tmdb_tool_definition_google()
             if tmdb_tool:
                 tools.append(tmdb_tool)
+        
+        if enable_openlibrary_tool:
+            ol_tool = self._get_openlibrary_tool_definition_google()
+            if ol_tool:
+                tools.append(ol_tool)
         
         if tools:
             payload["tools"] = tools
@@ -428,6 +665,13 @@ class AIProcessor:
                 text = text.strip()
                 
                 logger.debug("Parsing AI response as JSON")
+                
+                if not text:
+                    logger.warning("Google AI returned empty response text")
+                    return []
+                
+                text = self._extract_json(text)
+                
                 result = json.loads(text)
                 
                 if isinstance(result, dict) and 'files' in result:
@@ -460,7 +704,7 @@ class AIProcessor:
             logger.error(f"Unexpected error during AI processing: {type(e).__name__}: {e}")
             raise
 
-    def _process_batch_openai(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False) -> List[Dict]:
+    def _process_batch_openai(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False) -> List[Dict]:
         """Process files using OpenAI with optional web search."""
         api_key = self.config_manager.get('OPENAI_API_KEY', '')
         if not api_key:
@@ -500,6 +744,12 @@ class AIProcessor:
                 tmdb_tools = self._get_tmdb_tools_for_openai()
                 if tmdb_tools:
                     tools.extend(tmdb_tools)
+                use_chat_api = True
+            
+            if enable_openlibrary_tool:
+                ol_tools = self._get_openlibrary_tools_for_openai()
+                if ol_tools:
+                    tools.extend(ol_tools)
                 use_chat_api = True
             
             # Log full request
@@ -628,6 +878,13 @@ class AIProcessor:
             text = text.strip()
             
             logger.debug("Parsing AI response as JSON")
+            
+            if not text:
+                logger.warning("OpenAI returned empty response text")
+                return []
+            
+            text = self._extract_json(text)
+            
             result = json.loads(text)
             
             if isinstance(result, dict) and 'files' in result:
@@ -644,6 +901,200 @@ class AIProcessor:
             logger.error(f"OpenAI API error: {type(e).__name__}: {e}")
             raise
 
+    def _process_batch_openrouter(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False) -> List[Dict]:
+        """Process files using OpenRouter (OpenAI-compatible API)."""
+        api_key = self.config_manager.get('OPENROUTER_API_KEY', '')
+        if not api_key:
+            logger.error("OPENROUTER_API_KEY not found in configuration")
+            raise ValueError("OPENROUTER_API_KEY not set. Please configure it in Settings.")
+        
+        if not self.openrouter_client or os.environ.get('OPENROUTER_API_KEY') != api_key:
+            self.openrouter_client = OpenAI(
+                base_url=OPENROUTER_BASE_URL,
+                api_key=api_key
+            )
+            logger.info("Initialized OpenRouter client")
+        
+        model = self.config_manager.get('AI_MODEL', 'deepseek/deepseek-chat')
+        logger.info(f"Using OpenRouter model: {model}")
+        prompt = self._prepare_batch_prompt(file_paths, custom_prompt, include_default, include_filename)
+        
+        try:
+            delay_seconds = self.config_manager.get('AI_CALL_DELAY_SECONDS', 2)
+            time_since_last_call = time.time() - self.last_api_call_time
+            
+            if time_since_last_call < delay_seconds:
+                wait_time = delay_seconds - time_since_last_call
+                logger.info(f"Rate limit protection: waiting {wait_time:.2f} seconds before API call")
+                time.sleep(wait_time)
+            
+            logger.info(f"Sending request to OpenRouter API: {model}")
+            
+            tools = []
+            use_tools = False
+            
+            if enable_web_search:
+                logger.warning("Web search is not supported with OpenRouter. Consider enabling TMDB tool for metadata lookup.")
+            
+            if enable_tmdb_tool:
+                tmdb_tools = self._get_tmdb_tools_for_openai()
+                if tmdb_tools:
+                    tools.extend(tmdb_tools)
+                    use_tools = True
+            
+            if enable_openlibrary_tool:
+                ol_tools = self._get_openlibrary_tools_for_openai()
+                if ol_tools:
+                    tools.extend(ol_tools)
+                    use_tools = True
+            
+            logger.info("=" * 80)
+            logger.info("OPENROUTER API REQUEST")
+            logger.info("=" * 80)
+            logger.info(f"Model: {model}")
+            logger.info(f"Web Search Enabled: {enable_web_search}")
+            logger.info(f"TMDB Tool Enabled: {enable_tmdb_tool}")
+            logger.info(f"Prompt (first 500 chars): {prompt[:500]}...")
+            logger.info(f"Full Prompt:\n{prompt}")
+            if tools:
+                logger.info(f"Tools: {json.dumps(tools, indent=2)}")
+            logger.info("=" * 80)
+            
+            temperature = float(self.config_manager.get('OPENROUTER_TEMPERATURE', 0.1))
+            max_tokens = int(self.config_manager.get('OPENROUTER_MAX_TOKENS', 4096))
+            top_p = float(self.config_manager.get('OPENROUTER_TOP_P', 1))
+            
+            messages = [{"role": "user", "content": prompt}]
+            
+            if use_tools:
+                max_turns = 5
+                turn = 0
+                
+                while turn < max_turns:
+                    turn += 1
+                    logger.info(f"OpenRouter conversation turn {turn}/{max_turns}")
+                    
+                    response = self.openrouter_client.chat.completions.create(
+                        model=model,
+                        messages=messages,
+                        tools=tools,
+                        tool_choice="auto",
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        top_p=top_p
+                    )
+                    
+                    self.last_api_call_time = time.time()
+                    message = response.choices[0].message
+                    messages.append(message)
+                    
+                    if message.tool_calls:
+                        logger.info(f"AI requested {len(message.tool_calls)} tool call(s)")
+                        
+                        for tool_call in message.tool_calls:
+                            function_name = tool_call.function.name
+                            function_args = json.loads(tool_call.function.arguments)
+                            
+                            logger.info(f"Executing function: {function_name} with args: {function_args}")
+                            function_result = self._execute_tmdb_function(function_name, function_args)
+                            
+                            messages.append({
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": json.dumps(function_result)
+                            })
+                            
+                            logger.info(f"Function {function_name} returned: {function_result}")
+                        
+                        continue
+                    
+                    if message.content:
+                        text = message.content
+                        logger.info(f"Received final response from OpenRouter API")
+                        break
+                    elif hasattr(message, 'reasoning_content') and message.reasoning_content:
+                        text = message.reasoning_content
+                        logger.info(f"Using reasoning_content from OpenRouter response")
+                        break
+                    else:
+                        logger.warning("No content or tool calls in response")
+                        text = "[]"
+                        break
+                
+                if turn >= max_turns:
+                    logger.warning(f"Maximum conversation turns ({max_turns}) reached")
+                    text = "[]"
+            else:
+                response = self.openrouter_client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    top_p=top_p
+                )
+                
+                self.last_api_call_time = time.time()
+                logger.info(f"Received successful response from OpenRouter API")
+                message = response.choices[0].message
+                
+                # OpenRouter/DeepSeek may return content in reasoning_content field
+                if message.content is not None:
+                    text = message.content
+                elif hasattr(message, 'reasoning_content') and message.reasoning_content:
+                    text = message.reasoning_content
+                    logger.info("Using reasoning_content from OpenRouter response")
+                else:
+                    logger.warning(f"No content in OpenRouter response. Raw message: {message}")
+                    text = ""
+            
+            logger.info("=" * 80)
+            logger.info("OPENROUTER API RESPONSE")
+            logger.info("=" * 80)
+            logger.info(f"Response length: {len(text)} characters")
+            logger.info(f"Full Response:\n{text}")
+            logger.info("=" * 80)
+            
+            logger.debug(f"Raw AI response length: {len(text)} characters")
+            
+            text = text.strip()
+            if text.startswith('```json'):
+                text = text[7:]
+            if text.startswith('```'):
+                text = text[3:]
+            if text.endswith('```'):
+                text = text[:-3]
+            text = text.strip()
+            
+            logger.debug("Parsing AI response as JSON")
+            
+            if not text:
+                logger.warning("OpenRouter returned empty response text — model may not be available or returned no content")
+                return []
+            
+            text = self._extract_json(text)
+            
+            try:
+                result = json.loads(text)
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse JSON response. Error: {e}")
+                logger.error(f"Text that failed to parse (first 500 chars): {text[:500]}")
+                logger.error(f"Text repr (first 200 chars): {repr(text[:200])}")
+                return []
+            
+            if isinstance(result, dict) and 'files' in result:
+                logger.info(f"AI processing completed successfully: {len(result['files'])} results returned")
+                return result['files']
+            elif isinstance(result, list):
+                logger.info(f"AI processing completed successfully: {len(result)} results returned")
+                return result
+            else:
+                logger.warning("AI response did not contain expected format, returning empty list")
+                return []
+                
+        except Exception as e:
+            logger.error(f"OpenRouter API error: {type(e).__name__}: {e}")
+            raise
+
     def get_available_models(self, provider: Optional[str] = None) -> List[str]:
         """Get available models for the specified provider."""
         if not provider:
@@ -653,6 +1104,8 @@ class AIProcessor:
         
         if provider == 'openai':
             return self.OPENAI_MODELS
+        elif provider == 'openrouter':
+            return self.OPENROUTER_MODELS
         elif provider == 'ollama':
             return self._get_ollama_models()
         else:
@@ -692,7 +1145,7 @@ class AIProcessor:
             logger.error(f"Unexpected error fetching Ollama models: {e}")
             return ["Error: Failed to fetch models"]
     
-    def _process_batch_ollama(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False) -> List[Dict]:
+    def _process_batch_ollama(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False) -> List[Dict]:
         """Process files using Ollama."""
         base_url = self.config_manager.get('OLLAMA_BASE_URL', 'http://localhost:11434')
         if not base_url:
@@ -708,8 +1161,16 @@ class AIProcessor:
         
         # Build tools for Ollama (same format as OpenAI)
         if enable_tmdb_tool:
-            tmdb_tools = self._get_tmdb_tools_for_openai()  # Ollama uses OpenAI-compatible format
+            tmdb_tools = self._get_tmdb_tools_for_openai()
         else:
+            tmdb_tools = []
+        
+        if enable_openlibrary_tool:
+            ol_tools = self._get_openlibrary_tools_for_openai()
+            if not enable_tmdb_tool:
+                tmdb_tools = []
+            tmdb_tools.extend(ol_tools)
+        elif not enable_tmdb_tool:
             tmdb_tools = []
         
         try:
@@ -822,6 +1283,13 @@ class AIProcessor:
             text = text.strip()
             
             logger.debug("Parsing AI response as JSON")
+            
+            if not text:
+                logger.warning("Ollama returned empty response text")
+                return []
+            
+            text = self._extract_json(text)
+            
             result = json.loads(text)
             
             if isinstance(result, dict) and 'files' in result:

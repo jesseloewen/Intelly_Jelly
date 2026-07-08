@@ -348,10 +348,11 @@ def re_ai_job(job_id):
         # Always use settings from config for web search and TMDB tool
         enable_web_search = config_manager.get('ENABLE_WEB_SEARCH', False)
         enable_tmdb_tool = config_manager.get('ENABLE_TMDB_TOOL', False)
+        enable_openlibrary_tool = config_manager.get('ENABLE_OPENLIBRARY_TOOL', False)
         
-        logger.debug(f"Re-AI job data: custom_prompt={bool(custom_prompt)}, include_instructions={include_instructions}, include_filename={include_filename}, enable_web_search={enable_web_search}, enable_tmdb_tool={enable_tmdb_tool}")
+        logger.debug(f"Re-AI job data: custom_prompt={bool(custom_prompt)}, include_instructions={include_instructions}, include_filename={include_filename}, enable_web_search={enable_web_search}, enable_tmdb_tool={enable_tmdb_tool}, enable_openlibrary_tool={enable_openlibrary_tool}")
         
-        success = orchestrator.re_ai_job(job_id, custom_prompt, include_instructions, include_filename, enable_web_search, enable_tmdb_tool)
+        success = orchestrator.re_ai_job(job_id, custom_prompt, include_instructions, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool)
         
         if success:
             logger.info(f"Job {job_id} queued for re-processing")
@@ -409,15 +410,18 @@ def update_config():
         'AI_MODEL',
         'GOOGLE_MODEL',
         'OPENAI_MODEL',
+        'OPENROUTER_MODEL',
         'OLLAMA_MODEL',
         'ENABLE_WEB_SEARCH',
         'ENABLE_TMDB_TOOL',
+        'ENABLE_OPENLIBRARY_TOOL',
         'AI_CALL_DELAY_SECONDS',
         'JELLYFIN_REFRESH_ENABLED',
         'APP_PASSWORD',
         'ADMIN_PASSWORD',
         'GOOGLE_API_KEY',
         'OPENAI_API_KEY',
+        'OPENROUTER_API_KEY',
         'TMDB_API_KEY',
         'OLLAMA_BASE_URL',
         'OLLAMA_TEMPERATURE',

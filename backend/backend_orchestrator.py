@@ -125,6 +125,7 @@ class BackendOrchestrator:
         # Apply default web search and TMDB tool settings from config
         job.enable_web_search = self.config_manager.get('ENABLE_WEB_SEARCH', False)
         job.enable_tmdb_tool = self.config_manager.get('ENABLE_TMDB_TOOL', False)
+        job.enable_openlibrary_tool = self.config_manager.get('ENABLE_OPENLIBRARY_TOOL', False)
         
         if existing_group_job and existing_group_job.group_id:
             # Add this job to the existing group
@@ -301,6 +302,7 @@ class BackendOrchestrator:
             include_filename = getattr(primary_job, 'include_filename', True)
             enable_web_search = getattr(primary_job, 'enable_web_search', self.config_manager.get('ENABLE_WEB_SEARCH', False))
             enable_tmdb_tool = getattr(primary_job, 'enable_tmdb_tool', self.config_manager.get('ENABLE_TMDB_TOOL', False))
+            enable_openlibrary_tool = getattr(primary_job, 'enable_openlibrary_tool', self.config_manager.get('ENABLE_OPENLIBRARY_TOOL', False))
             
             # Process all files together
             file_paths = [job.relative_path for job in jobs]
@@ -310,7 +312,8 @@ class BackendOrchestrator:
                 include_default=include_instructions,
                 include_filename=include_filename,
                 enable_web_search=enable_web_search,
-                enable_tmdb_tool=enable_tmdb_tool
+                enable_tmdb_tool=enable_tmdb_tool,
+                enable_openlibrary_tool=enable_openlibrary_tool
             )
             
             if results and len(results) == len(jobs):
@@ -391,8 +394,9 @@ class BackendOrchestrator:
             include_filename = getattr(job, 'include_filename', True)
             enable_web_search = getattr(job, 'enable_web_search', self.config_manager.get('ENABLE_WEB_SEARCH', False))
             enable_tmdb_tool = getattr(job, 'enable_tmdb_tool', self.config_manager.get('ENABLE_TMDB_TOOL', False))
+            enable_openlibrary_tool = getattr(job, 'enable_openlibrary_tool', self.config_manager.get('ENABLE_OPENLIBRARY_TOOL', False))
             
-            logger.debug(f"Job {job.job_id} settings: custom_prompt={bool(custom_prompt)}, include_instructions={include_instructions}, include_filename={include_filename}, web_search={enable_web_search}, tmdb_tool={enable_tmdb_tool}")
+            logger.debug(f"Job {job.job_id} settings: custom_prompt={bool(custom_prompt)}, include_instructions={include_instructions}, include_filename={include_filename}, web_search={enable_web_search}, tmdb_tool={enable_tmdb_tool}, openlibrary_tool={enable_openlibrary_tool}")
             
             # Process single file
             result = self.ai_processor.process_single(
@@ -401,7 +405,8 @@ class BackendOrchestrator:
                 include_default=include_instructions,
                 include_filename=include_filename,
                 enable_web_search=enable_web_search,
-                enable_tmdb_tool=enable_tmdb_tool
+                enable_tmdb_tool=enable_tmdb_tool,
+                enable_openlibrary_tool=enable_openlibrary_tool
             )
             
             if result:
@@ -639,9 +644,9 @@ class BackendOrchestrator:
         
         return True
 
-    def re_ai_job(self, job_id: str, custom_prompt: Optional[str] = None, include_instructions: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False):
+    def re_ai_job(self, job_id: str, custom_prompt: Optional[str] = None, include_instructions: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False):
         logger.info(f"Re-AI requested for job {job_id}")
-        logger.debug(f"Custom prompt: {bool(custom_prompt)}, Include instructions: {include_instructions}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}")
+        logger.debug(f"Custom prompt: {bool(custom_prompt)}, Include instructions: {include_instructions}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}")
         
         job = self.job_store.get_job(job_id)
         if not job:
@@ -657,7 +662,8 @@ class BackendOrchestrator:
             include_instructions=include_instructions,
             include_filename=include_filename,
             enable_web_search=enable_web_search,
-            enable_tmdb_tool=enable_tmdb_tool
+            enable_tmdb_tool=enable_tmdb_tool,
+            enable_openlibrary_tool=enable_openlibrary_tool
         )
         logger.info(f"Job {job_id} marked as QUEUED_FOR_AI with priority=True")
         
