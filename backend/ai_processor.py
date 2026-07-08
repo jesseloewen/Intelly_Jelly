@@ -3,7 +3,7 @@ import logging
 import os
 import requests
 import time
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Callable
 from openai import OpenAI
 from backend.tmdb_api import TMDBClient, format_tool_response
 from backend.openlibrary_api import OpenLibraryClient, format_openlibrary_response
@@ -470,16 +470,15 @@ class AIProcessor:
         
         return prompt
 
-    def process_single(self, file_path: str, custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False) -> Optional[Dict]:
+    def process_single(self, file_path: str, custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, on_event: Optional[Callable] = None) -> Optional[Dict]:
         """Process a single file using configured AI with optional web search and tools."""
         logger.info(f"Starting AI processing for file: {file_path}")
         logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}")
         
-        # Process as single-item batch and return first result
-        results = self.process_batch([file_path], custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool)
+        results = self.process_batch([file_path], custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, on_event=on_event)
         return results[0] if results else None
     
-    def process_batch(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False) -> List[Dict]:
+    def process_batch(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using configured AI provider with optional web search and tools."""
         logger.info(f"Starting AI processing for {len(file_paths)} file(s)")
         logger.debug(f"Files to process: {file_paths}")
@@ -502,15 +501,15 @@ class AIProcessor:
         logger.info(f"Using AI provider: {provider}")
         
         if provider == 'openai':
-            return self._process_batch_openai(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool)
+            return self._process_batch_openai(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, on_event=on_event)
         elif provider == 'openrouter':
-            return self._process_batch_openrouter(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool)
+            return self._process_batch_openrouter(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, on_event=on_event)
         elif provider == 'ollama':
-            return self._process_batch_ollama(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool)
+            return self._process_batch_ollama(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, on_event=on_event)
         else:
-            return self._process_batch_google(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool)
+            return self._process_batch_google(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, on_event=on_event)
     
-    def _process_batch_google(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False) -> List[Dict]:
+    def _process_batch_google(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using Google AI with optional web search and tools."""
         api_key = self.config_manager.get('GOOGLE_API_KEY', '')
         if not api_key:
@@ -571,6 +570,14 @@ class AIProcessor:
                 time.sleep(wait_time)
             
             logger.info(f"Sending request to Google AI API: {model}")
+            
+            if on_event:
+                tools_active = []
+                if enable_web_search: tools_active.append("web_search")
+                if enable_tmdb_tool: tools_active.append("tmdb")
+                if enable_openlibrary_tool: tools_active.append("openlibrary")
+                on_event({"type": "api_request", "provider": "google", "model": model, "tools": tools_active})
+            
             logger.debug(f"API URL: {url.split('?')[0]}")  # Log URL without API key
             logger.debug(f"Payload config: temperature={payload['generationConfig']['temperature']}, maxTokens={payload['generationConfig']['maxOutputTokens']}")
             
@@ -592,11 +599,16 @@ class AIProcessor:
             max_turns = 5  # Prevent infinite loops
             
             for turn in range(max_turns):
+                req_start = time.time()
                 response = requests.post(url, json=payload)
-                self.last_api_call_time = time.time()  # Record time of API call
+                req_duration = int((time.time() - req_start) * 1000)
+                self.last_api_call_time = time.time()
                 response.raise_for_status()
                 
                 logger.info(f"Received successful response from Google AI API (status: {response.status_code})")
+                
+                if on_event:
+                    on_event({"type": "api_response", "turn": turn + 1, "duration_ms": req_duration})
                 
                 # Log full response
                 logger.info("=" * 80)
@@ -626,7 +638,11 @@ class AIProcessor:
                         func_args = fc['functionCall'].get('args', {})
                         
                         logger.info(f"Executing function: {func_name} with args: {func_args}")
+                        if on_event:
+                            on_event({"type": "tool_started", "tool": func_name, "args": json.dumps(func_args)})
                         result = self._execute_tmdb_function(func_name, func_args)
+                        if on_event:
+                            on_event({"type": "tool_completed", "tool": func_name})
                         
                         function_responses.append({
                             "functionResponse": {
@@ -676,7 +692,11 @@ class AIProcessor:
                 
                 if isinstance(result, dict) and 'files' in result:
                     logger.info(f"AI processing completed successfully: {len(result['files'])} results returned")
-                    return result['files']
+                    files = result['files']
+                    if on_event and files:
+                        first = files[0]
+                        on_event({"type": "result", "confidence": first.get('confidence', 0), "file_count": len(files)})
+                    return files
                 elif isinstance(result, list):
                     logger.info(f"AI processing completed successfully: {len(result)} results returned")
                     return result
@@ -691,20 +711,28 @@ class AIProcessor:
         except requests.exceptions.HTTPError as e:
             logger.error(f"Google API HTTP error: {e}, Status code: {response.status_code if 'response' in locals() else 'N/A'}")
             logger.error(f"Response content: {response.text if 'response' in locals() else 'N/A'}")
+            if on_event:
+                on_event({"type": "error", "message": f"API error: {e}"})
             raise
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse AI response as JSON: {e}")
             logger.error(f"Raw response text: {text if 'text' in locals() else 'N/A'}")
+            if on_event:
+                on_event({"type": "error", "message": "Failed to parse AI response"})
             raise
         except KeyError as e:
             logger.error(f"Unexpected response structure from Google API: {e}")
             logger.error(f"Response data: {data if 'data' in locals() else 'N/A'}")
+            if on_event:
+                on_event({"type": "error", "message": f"Unexpected API response structure"})
             raise
         except Exception as e:
             logger.error(f"Unexpected error during AI processing: {type(e).__name__}: {e}")
+            if on_event:
+                on_event({"type": "error", "message": str(e)})
             raise
 
-    def _process_batch_openai(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False) -> List[Dict]:
+    def _process_batch_openai(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using OpenAI with optional web search."""
         api_key = self.config_manager.get('OPENAI_API_KEY', '')
         if not api_key:
@@ -732,6 +760,13 @@ class AIProcessor:
                 time.sleep(wait_time)
             
             logger.info(f"Sending request to OpenAI API: {model}")
+            
+            if on_event:
+                tools_active = []
+                if enable_web_search: tools_active.append("web_search")
+                if enable_tmdb_tool: tools_active.append("tmdb")
+                if enable_openlibrary_tool: tools_active.append("openlibrary")
+                on_event({"type": "api_request", "provider": "openai", "model": model, "tools": tools_active})
             
             # Build tools list - only TMDB supported (web search not available in standard OpenAI API)
             tools = []
@@ -785,6 +820,7 @@ class AIProcessor:
                     turn += 1
                     logger.info(f"OpenAI conversation turn {turn}/{max_turns}")
                     
+                    req_start = time.time()
                     response = self.openai_client.chat.completions.create(
                         model=model,
                         messages=messages,
@@ -796,10 +832,14 @@ class AIProcessor:
                         frequency_penalty=frequency_penalty,
                         presence_penalty=presence_penalty
                     )
+                    req_duration = int((time.time() - req_start) * 1000)
                     
                     self.last_api_call_time = time.time()
                     message = response.choices[0].message
                     messages.append(message)
+                    
+                    if on_event:
+                        on_event({"type": "api_response", "turn": turn, "duration_ms": req_duration})
                     
                     # Check if AI made tool calls
                     if message.tool_calls:
@@ -812,8 +852,13 @@ class AIProcessor:
                             
                             logger.info(f"Executing function: {function_name} with args: {function_args}")
                             
-                            # Execute TMDB function
+                            if on_event:
+                                on_event({"type": "tool_started", "tool": function_name, "args": json.dumps(function_args)})
+                            
                             function_result = self._execute_tmdb_function(function_name, function_args)
+                            
+                            if on_event:
+                                on_event({"type": "tool_completed", "tool": function_name})
                             
                             # Add function result to messages
                             messages.append({
@@ -842,6 +887,7 @@ class AIProcessor:
                     text = "[]"
             else:
                 # Use responses.create API (no tools needed)
+                req_start = time.time()
                 response = self.openai_client.responses.create(
                     model=model,
                     input=prompt,
@@ -851,9 +897,13 @@ class AIProcessor:
                     frequency_penalty=frequency_penalty,
                     presence_penalty=presence_penalty
                 )
+                req_duration = int((time.time() - req_start) * 1000)
                 
                 self.last_api_call_time = time.time()
                 logger.info(f"Received successful response from OpenAI Responses API")
+                
+                if on_event:
+                    on_event({"type": "api_response", "turn": 1, "duration_ms": req_duration})
                 
                 # Extract the text using output_text
                 text = response.output_text
@@ -889,9 +939,15 @@ class AIProcessor:
             
             if isinstance(result, dict) and 'files' in result:
                 logger.info(f"AI processing completed successfully: {len(result['files'])} results returned")
-                return result['files']
+                files = result['files']
+                if on_event and files:
+                    first = files[0]
+                    on_event({"type": "result", "confidence": first.get('confidence', 0), "file_count": len(files)})
+                return files
             elif isinstance(result, list):
                 logger.info(f"AI processing completed successfully: {len(result)} results returned")
+                if on_event and result:
+                    on_event({"type": "result", "confidence": result[0].get('confidence', 0) if isinstance(result[0], dict) else 0, "file_count": len(result)})
                 return result
             else:
                 logger.warning("AI response did not contain expected format, returning empty list")
@@ -899,9 +955,11 @@ class AIProcessor:
                 
         except Exception as e:
             logger.error(f"OpenAI API error: {type(e).__name__}: {e}")
+            if on_event:
+                on_event({"type": "error", "message": str(e)})
             raise
 
-    def _process_batch_openrouter(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False) -> List[Dict]:
+    def _process_batch_openrouter(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using OpenRouter (OpenAI-compatible API)."""
         api_key = self.config_manager.get('OPENROUTER_API_KEY', '')
         if not api_key:
@@ -929,6 +987,13 @@ class AIProcessor:
                 time.sleep(wait_time)
             
             logger.info(f"Sending request to OpenRouter API: {model}")
+            
+            if on_event:
+                tools_active = []
+                if enable_web_search: tools_active.append("web_search")
+                if enable_tmdb_tool: tools_active.append("tmdb")
+                if enable_openlibrary_tool: tools_active.append("openlibrary")
+                on_event({"type": "api_request", "provider": "openrouter", "model": model, "tools": tools_active})
             
             tools = []
             use_tools = False
@@ -974,6 +1039,7 @@ class AIProcessor:
                     turn += 1
                     logger.info(f"OpenRouter conversation turn {turn}/{max_turns}")
                     
+                    req_start = time.time()
                     response = self.openrouter_client.chat.completions.create(
                         model=model,
                         messages=messages,
@@ -983,10 +1049,14 @@ class AIProcessor:
                         max_tokens=max_tokens,
                         top_p=top_p
                     )
+                    req_duration = int((time.time() - req_start) * 1000)
                     
                     self.last_api_call_time = time.time()
                     message = response.choices[0].message
                     messages.append(message)
+                    
+                    if on_event:
+                        on_event({"type": "api_response", "turn": turn, "duration_ms": req_duration})
                     
                     if message.tool_calls:
                         logger.info(f"AI requested {len(message.tool_calls)} tool call(s)")
@@ -996,7 +1066,11 @@ class AIProcessor:
                             function_args = json.loads(tool_call.function.arguments)
                             
                             logger.info(f"Executing function: {function_name} with args: {function_args}")
+                            if on_event:
+                                on_event({"type": "tool_started", "tool": function_name, "args": json.dumps(function_args)})
                             function_result = self._execute_tmdb_function(function_name, function_args)
+                            if on_event:
+                                on_event({"type": "tool_completed", "tool": function_name})
                             
                             messages.append({
                                 "role": "tool",
@@ -1025,6 +1099,7 @@ class AIProcessor:
                     logger.warning(f"Maximum conversation turns ({max_turns}) reached")
                     text = "[]"
             else:
+                req_start = time.time()
                 response = self.openrouter_client.chat.completions.create(
                     model=model,
                     messages=messages,
@@ -1032,9 +1107,13 @@ class AIProcessor:
                     max_tokens=max_tokens,
                     top_p=top_p
                 )
+                req_duration = int((time.time() - req_start) * 1000)
                 
                 self.last_api_call_time = time.time()
                 logger.info(f"Received successful response from OpenRouter API")
+                
+                if on_event:
+                    on_event({"type": "api_response", "turn": 1, "duration_ms": req_duration})
                 message = response.choices[0].message
                 
                 # OpenRouter/DeepSeek may return content in reasoning_content field
@@ -1083,9 +1162,15 @@ class AIProcessor:
             
             if isinstance(result, dict) and 'files' in result:
                 logger.info(f"AI processing completed successfully: {len(result['files'])} results returned")
-                return result['files']
+                files = result['files']
+                if on_event and files:
+                    first = files[0]
+                    on_event({"type": "result", "confidence": first.get('confidence', 0), "file_count": len(files)})
+                return files
             elif isinstance(result, list):
                 logger.info(f"AI processing completed successfully: {len(result)} results returned")
+                if on_event and result:
+                    on_event({"type": "result", "confidence": result[0].get('confidence', 0) if isinstance(result[0], dict) else 0, "file_count": len(result)})
                 return result
             else:
                 logger.warning("AI response did not contain expected format, returning empty list")
@@ -1093,6 +1178,8 @@ class AIProcessor:
                 
         except Exception as e:
             logger.error(f"OpenRouter API error: {type(e).__name__}: {e}")
+            if on_event:
+                on_event({"type": "error", "message": str(e)})
             raise
 
     def get_available_models(self, provider: Optional[str] = None) -> List[str]:
@@ -1145,7 +1232,7 @@ class AIProcessor:
             logger.error(f"Unexpected error fetching Ollama models: {e}")
             return ["Error: Failed to fetch models"]
     
-    def _process_batch_ollama(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False) -> List[Dict]:
+    def _process_batch_ollama(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using Ollama."""
         base_url = self.config_manager.get('OLLAMA_BASE_URL', 'http://localhost:11434')
         if not base_url:
@@ -1184,6 +1271,12 @@ class AIProcessor:
                 time.sleep(wait_time)
             
             logger.info(f"Sending request to Ollama API: {model}")
+            
+            if on_event:
+                tools_active = []
+                if enable_tmdb_tool: tools_active.append("tmdb")
+                if enable_openlibrary_tool: tools_active.append("openlibrary")
+                on_event({"type": "api_request", "provider": "ollama", "model": model, "tools": tools_active})
             
             # Log full request
             logger.info("=" * 80)
@@ -1225,7 +1318,9 @@ class AIProcessor:
             
             logger.info(f"Ollama options: temperature={temperature}, num_predict={num_predict}, top_k={top_k}, top_p={top_p}")
             
+            req_start = time.time()
             response = requests.post(url, json=payload, timeout=120)
+            req_duration = int((time.time() - req_start) * 1000)
             self.last_api_call_time = time.time()
             
             # Log response before raising error
@@ -1241,6 +1336,9 @@ class AIProcessor:
             response.raise_for_status()
             
             logger.info(f"Received successful response from Ollama API (status: {response.status_code})")
+            
+            if on_event:
+                on_event({"type": "api_response", "turn": 1, "duration_ms": req_duration})
             
             data = response.json()
             
@@ -1294,9 +1392,15 @@ class AIProcessor:
             
             if isinstance(result, dict) and 'files' in result:
                 logger.info(f"AI processing completed successfully: {len(result['files'])} results returned")
-                return result['files']
+                files = result['files']
+                if on_event and files:
+                    first = files[0]
+                    on_event({"type": "result", "confidence": first.get('confidence', 0), "file_count": len(files)})
+                return files
             elif isinstance(result, list):
                 logger.info(f"AI processing completed successfully: {len(result)} results returned")
+                if on_event and result:
+                    on_event({"type": "result", "confidence": result[0].get('confidence', 0) if isinstance(result[0], dict) else 0, "file_count": len(result)})
                 return result
             else:
                 logger.warning("AI response did not contain expected format, returning empty list")
@@ -1305,17 +1409,28 @@ class AIProcessor:
         except requests.exceptions.HTTPError as e:
             logger.error(f"Ollama API HTTP error: {e}, Status code: {response.status_code if 'response' in locals() else 'N/A'}")
             logger.error(f"Response content: {response.text if 'response' in locals() else 'N/A'}")
+            if on_event:
+                on_event({"type": "error", "message": f"HTTP error: {e}"})
             raise
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse AI response as JSON: {e}")
             logger.error(f"Raw response text: {text if 'text' in locals() else 'N/A'}")
+            if on_event:
+                on_event({"type": "error", "message": "Failed to parse AI response"})
             raise
         except requests.exceptions.Timeout:
             logger.error("Ollama API request timed out")
+            if on_event:
+                on_event({"type": "error", "message": "Request timed out"})
             raise
         except requests.exceptions.RequestException as e:
             logger.error(f"Ollama API connection error: {e}")
+            if on_event:
+                on_event({"type": "error", "message": f"Connection error: {e}"})
             raise
         except Exception as e:
             logger.error(f"Unexpected error during AI processing: {type(e).__name__}: {e}")
+            if on_event:
+                on_event({"type": "error", "message": str(e)})
+            raise
             raise

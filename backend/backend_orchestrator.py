@@ -17,6 +17,7 @@ from backend.file_watcher import (
     CompletedFolderHandler
 )
 from backend.file_movement_logger import FileMovementLogger
+from backend.ai_sse_broker import AISSEBroker
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class BackendOrchestrator:
         self.job_store = job_store
         self.ai_processor = AIProcessor(config_manager)
         self.file_movement_logger = FileMovementLogger()
+        self.ai_sse_broker = AISSEBroker()
         
         self.downloading_watcher: Optional[FileWatcher] = None
         self.completed_watcher: Optional[FileWatcher] = None
@@ -288,15 +290,16 @@ class BackendOrchestrator:
     
     def _process_grouped_jobs(self, jobs: List, is_priority: bool = False):
         """Process a group of jobs with the same base name together through AI."""
-        # Mark all jobs as processing
         for job in jobs:
             self.job_store.update_job(job.job_id, JobStatus.PROCESSING_AI)
+        
+        primary_job = next((j for j in jobs if j.is_group_primary), jobs[0])
+        self.ai_sse_broker.publish({"type": "job_started", "job_id": primary_job.job_id, "file": f"{len(jobs)} files grouped"})
+        self.ai_sse_broker.publish({"type": "thinking", "message": "Analyzing filenames..."})
         
         logger.info(f"Processing group of {len(jobs)} files together")
         
         try:
-            # Use settings from primary job
-            primary_job = next((j for j in jobs if j.is_group_primary), jobs[0])
             custom_prompt = getattr(primary_job, 'custom_prompt', None)
             include_instructions = getattr(primary_job, 'include_instructions', True)
             include_filename = getattr(primary_job, 'include_filename', True)
@@ -304,7 +307,6 @@ class BackendOrchestrator:
             enable_tmdb_tool = getattr(primary_job, 'enable_tmdb_tool', self.config_manager.get('ENABLE_TMDB_TOOL', False))
             enable_openlibrary_tool = getattr(primary_job, 'enable_openlibrary_tool', self.config_manager.get('ENABLE_OPENLIBRARY_TOOL', False))
             
-            # Process all files together
             file_paths = [job.relative_path for job in jobs]
             results = self.ai_processor.process_batch(
                 file_paths,
@@ -313,7 +315,8 @@ class BackendOrchestrator:
                 include_filename=include_filename,
                 enable_web_search=enable_web_search,
                 enable_tmdb_tool=enable_tmdb_tool,
-                enable_openlibrary_tool=enable_openlibrary_tool
+                enable_openlibrary_tool=enable_openlibrary_tool,
+                on_event=self.ai_sse_broker.publish
             )
             
             if results and len(results) == len(jobs):
@@ -360,9 +363,10 @@ class BackendOrchestrator:
                     logger.info(f"Job {job.job_id} completed: {job.relative_path} -> {suggested_name} (confidence: {confidence}%)")
                 
                 logger.info(f"All grouped files will remain in downloading folder until moved to completed folder for organization")
+                
+                self.ai_sse_broker.publish({"type": "job_done", "job_id": primary_job.job_id, "status": "pending_completion", "confidence": primary_result.get('confidence', 0), "name": f"{len(jobs)} files processed"})
             else:
                 logger.warning(f"AI results mismatch for grouped jobs: expected {len(jobs)}, got {len(results) if results else 0}")
-                # Mark all as failed
                 for job in jobs:
                     self.job_store.update_job(
                         job.job_id,
@@ -370,10 +374,10 @@ class BackendOrchestrator:
                         error_message="AI result mismatch for grouped files",
                         priority=False if is_priority else job.priority
                     )
+                self.ai_sse_broker.publish({"type": "job_error", "job_id": primary_job.job_id, "error": "AI result mismatch for grouped files"})
         
         except Exception as e:
             logger.error(f"Error processing grouped jobs: {type(e).__name__}: {e}", exc_info=True)
-            # Mark all jobs as failed
             for job in jobs:
                 self.job_store.update_job(
                     job.job_id,
@@ -381,14 +385,17 @@ class BackendOrchestrator:
                     error_message=str(e),
                     priority=False if is_priority else job.priority
                 )
+            self.ai_sse_broker.publish({"type": "job_error", "job_id": primary_job.job_id, "error": str(e)[:200]})
     
     def _process_single_job(self, job, is_priority: bool = False, is_retry: bool = False):
         """Process a single job through AI."""
         self.job_store.update_job(job.job_id, JobStatus.PROCESSING_AI)
         logger.debug(f"Updated job {job.job_id} to PROCESSING_AI status")
         
+        self.ai_sse_broker.publish({"type": "job_started", "job_id": job.job_id, "file": job.relative_path})
+        self.ai_sse_broker.publish({"type": "thinking", "message": "Analyzing filename..."})
+        
         try:
-            # Get job settings
             custom_prompt = getattr(job, 'custom_prompt', None)
             include_instructions = getattr(job, 'include_instructions', True)
             include_filename = getattr(job, 'include_filename', True)
@@ -398,7 +405,6 @@ class BackendOrchestrator:
             
             logger.debug(f"Job {job.job_id} settings: custom_prompt={bool(custom_prompt)}, include_instructions={include_instructions}, include_filename={include_filename}, web_search={enable_web_search}, tmdb_tool={enable_tmdb_tool}, openlibrary_tool={enable_openlibrary_tool}")
             
-            # Process single file
             result = self.ai_processor.process_single(
                 job.relative_path,
                 custom_prompt=custom_prompt,
@@ -406,7 +412,8 @@ class BackendOrchestrator:
                 include_filename=include_filename,
                 enable_web_search=enable_web_search,
                 enable_tmdb_tool=enable_tmdb_tool,
-                enable_openlibrary_tool=enable_openlibrary_tool
+                enable_openlibrary_tool=enable_openlibrary_tool,
+                on_event=self.ai_sse_broker.publish
             )
             
             if result:
@@ -419,11 +426,11 @@ class BackendOrchestrator:
                     confidence=confidence,
                     priority=False if is_priority else job.priority
                 )
+                self.ai_sse_broker.publish({"type": "job_done", "job_id": job.job_id, "status": "pending_completion", "confidence": confidence, "name": suggested_name[:80]})
                 logger.info(f"Job {job.job_id} completed: {job.relative_path} -> {suggested_name} (confidence: {confidence}%)")
                 logger.info(f"File will remain in downloading folder until moved to completed folder for organization")
             else:
                 logger.warning(f"No AI result returned for job {job.job_id}")
-                # Increment retry count if this is a retry attempt
                 if is_retry:
                     job.retry_count += 1
                     if job.retry_count >= job.max_retries:
@@ -435,10 +442,10 @@ class BackendOrchestrator:
                     error_message="No AI result returned",
                     priority=False if is_priority else job.priority
                 )
+                self.ai_sse_broker.publish({"type": "job_error", "job_id": job.job_id, "error": "No AI result returned"})
         
         except Exception as e:
             logger.error(f"Error processing job {job.job_id}: {type(e).__name__}: {e}", exc_info=True)
-            # Increment retry count if this is a retry attempt
             if is_retry:
                 job.retry_count += 1
                 if job.retry_count >= job.max_retries:
@@ -450,6 +457,7 @@ class BackendOrchestrator:
                 error_message=str(e),
                 priority=False if is_priority else job.priority
             )
+            self.ai_sse_broker.publish({"type": "job_error", "job_id": job.job_id, "error": str(e)[:200]})
 
 
 

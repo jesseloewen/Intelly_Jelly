@@ -535,6 +535,351 @@
                 max-height: 85vh;
             }
         }
+        
+        .filter-bar {
+            padding: 15px 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-bar .search-wrapper {
+            position: relative;
+            flex: 1;
+            min-width: 180px;
+        }
+        
+        .filter-bar .search-wrapper input {
+            width: 100%;
+            padding: 8px 12px 8px 36px;
+            border: 1px solid var(--input-border);
+            border-radius: 6px;
+            font-size: 14px;
+            background: var(--input-bg);
+            color: var(--input-text);
+        }
+        
+        .filter-bar .search-wrapper input:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+        
+        .filter-bar .search-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            font-size: 14px;
+            pointer-events: none;
+        }
+        
+        .filter-bar .clear-search {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 16px;
+            display: none;
+            padding: 2px 6px;
+            border-radius: 50%;
+        }
+        
+        .filter-bar .clear-search:hover {
+            color: var(--text-primary);
+            background: var(--table-row-hover);
+        }
+        
+        .filter-bar .status-chips {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-chip {
+            padding: 6px 14px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        
+        .filter-chip:hover {
+            opacity: 0.85;
+        }
+        
+        .filter-chip.inactive {
+            opacity: 0.35;
+            filter: grayscale(30%);
+        }
+        
+        .filter-chip.chip-queued {
+            background: var(--status-queued-bg);
+            color: var(--status-queued-text);
+        }
+        
+        .filter-chip.chip-processing {
+            background: var(--status-processing-bg);
+            color: var(--status-processing-text);
+        }
+        
+        .filter-chip.chip-pending {
+            background: var(--status-pending-bg);
+            color: var(--status-pending-text);
+        }
+        
+        .filter-chip.chip-failed {
+            background: var(--status-failed-bg);
+            color: var(--status-failed-text);
+        }
+        
+        .filter-divider {
+            width: 1px;
+            height: 24px;
+            background: var(--border-color);
+        }
+        
+        .filter-count {
+            font-size: 13px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+        
+        .jobs-table th.sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .jobs-table th.sortable:hover {
+            color: var(--primary-color);
+        }
+        
+        .sort-arrow {
+            font-size: 10px;
+            margin-left: 4px;
+            opacity: 0.5;
+        }
+        
+        .sort-arrow.active {
+            opacity: 1;
+            color: var(--primary-color);
+        }
+        
+        @media (max-width: 768px) {
+            .filter-bar {
+                padding: 12px 15px;
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filter-bar .search-wrapper {
+                max-width: none;
+            }
+            
+            .filter-bar .status-chips {
+                justify-content: center;
+            }
+            
+            .filter-count {
+                text-align: center;
+            }
+        }
+        
+        .ai-monitor {
+            margin-bottom: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            background: var(--card-bg);
+        }
+        
+        .ai-monitor-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            cursor: pointer;
+            user-select: none;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--table-header-bg);
+        }
+        
+        .ai-monitor-header:hover {
+            background: var(--table-row-hover);
+        }
+        
+        .ai-monitor-header .monitor-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .ai-monitor-header .monitor-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .monitor-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .monitor-dot.connected {
+            background: #00b894;
+            box-shadow: 0 0 6px rgba(0, 184, 148, 0.5);
+        }
+        
+        .monitor-dot.disconnected {
+            background: #d63031;
+            box-shadow: 0 0 6px rgba(214, 48, 49, 0.5);
+        }
+        
+        .monitor-dot.idle {
+            background: var(--text-secondary);
+        }
+        
+        .ai-monitor-header .toggle-arrow {
+            font-size: 12px;
+            color: var(--text-secondary);
+            transition: transform 0.2s;
+        }
+        
+        .ai-monitor.collapsed .toggle-arrow {
+            transform: rotate(-90deg);
+        }
+        
+        .ai-monitor-body {
+            max-height: 350px;
+            overflow-y: auto;
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            padding: 10px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .ai-monitor.collapsed .ai-monitor-body {
+            display: none;
+        }
+        
+        .ai-monitor-body::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .ai-monitor-body::-webkit-scrollbar-track {
+            background: var(--input-bg);
+        }
+        
+        .ai-monitor-body::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+        
+        .ai-event {
+            padding: 2px 0;
+            white-space: nowrap;
+        }
+        
+        .ai-event .event-time {
+            color: var(--text-secondary);
+            opacity: 0.6;
+            margin-right: 8px;
+        }
+        
+        .ai-event .event-icon {
+            margin-right: 6px;
+            display: inline-block;
+            width: 16px;
+            text-align: center;
+        }
+        
+        .ai-event .event-msg {
+            color: var(--text-primary);
+        }
+        
+        .ai-event.type-job_started .event-msg {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+        
+        .ai-event.type-job_done .event-msg {
+            color: #00b894;
+            font-weight: 600;
+        }
+        
+        .ai-event.type-job_error .event-msg {
+            color: #d63031;
+        }
+        
+        .ai-event.type-api_request .event-msg {
+            color: var(--text-secondary);
+        }
+        
+        .ai-event.type-api_response .event-msg {
+            color: var(--text-secondary);
+        }
+        
+        .ai-event.type-tool_started .event-msg {
+            color: #6c5ce7;
+        }
+        
+        .ai-event.type-result .event-msg {
+            color: #fdcb6e;
+        }
+        
+        .ai-monitor-empty {
+            color: var(--text-secondary);
+            font-style: italic;
+            padding: 8px 0;
+        }
+        
+        @media (max-width: 768px) {
+            .ai-monitor {
+                border-radius: 6px;
+            }
+            
+            .ai-monitor .ai-monitor.collapsed .ai-monitor-body {
+                display: none;
+            }
+            
+            .ai-monitor-body {
+                max-height: 250px;
+                font-size: 11px;
+                padding: 8px 12px;
+            }
+            
+            .ai-monitor-header {
+                padding: 8px 12px;
+            }
+            
+            .ai-monitor-header .monitor-title {
+                font-size: 13px;
+            }
+            
+            .ai-monitor-header .monitor-status {
+                font-size: 11px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -576,6 +921,37 @@
             <div class="stat-item">
                 <div class="stat-value" id="stat-failed">0</div>
                 <div class="stat-label">Failed</div>
+            </div>
+        </div>
+        
+        <div class="filter-bar">
+            <div class="status-chips" id="status-chips">
+                <span class="filter-chip chip-queued" data-status="Queued for AI" onclick="toggleStatusChip(this)">Queued</span>
+                <span class="filter-chip chip-processing" data-status="Processing AI" onclick="toggleStatusChip(this)">Processing</span>
+                <span class="filter-chip chip-pending" data-status="Pending Completion" onclick="toggleStatusChip(this)">Pending</span>
+                <span class="filter-chip chip-failed" data-status="Failed" onclick="toggleStatusChip(this)">Failed</span>
+            </div>
+            <div class="search-wrapper">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="search-input" placeholder="Search jobs..." oninput="onFilterChange()">
+                <button class="clear-search" id="clear-search" onclick="clearSearch()" title="Clear search">&times;</button>
+            </div>
+            <span class="filter-count" id="filter-count"></span>
+        </div>
+        
+        <div class="ai-monitor" id="ai-monitor">
+            <div class="ai-monitor-header" onclick="toggleMonitor()">
+                <span class="monitor-title">
+                    <span class="toggle-arrow">▶</span>
+                    AI Monitor
+                </span>
+                <span class="monitor-status">
+                    <span class="monitor-dot disconnected" id="monitor-dot"></span>
+                    <span id="monitor-status-text">disconnected</span>
+                </span>
+            </div>
+            <div class="ai-monitor-body" id="ai-monitor-body">
+                <div class="ai-monitor-empty">Waiting for jobs...</div>
             </div>
         </div>
         
@@ -637,7 +1013,6 @@
     </div>
     
     <script>
-        // Cookie utility functions
         function setCookie(name, value, days = 365) {
             const date = new Date();
             date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
@@ -656,7 +1031,6 @@
             return null;
         }
         
-        // Theme management
         function initTheme() {
             const savedTheme = getCookie('intelly-jelly-theme') || 'dark';
             document.documentElement.setAttribute('data-theme', savedTheme);
@@ -676,10 +1050,12 @@
             icon.textContent = theme === 'dark' ? '🌙' : '☀️';
         }
         
-        // Initialize theme on page load
         initTheme();
         
         let currentJobId = null;
+        let allJobs = [];
+        let sortColumn = 'created_at';
+        let sortDir = 'asc';
         
         function getStatusClass(status) {
             const statusMap = {
@@ -691,6 +1067,139 @@
                 'Manual Edit': 'status-manual'
             };
             return statusMap[status] || 'status-queued';
+        }
+        
+        function readUrlParams() {
+            const p = new URLSearchParams(window.location.search);
+            return {
+                search: p.get('search') || '',
+                statuses: p.get('status') ? p.get('status').split(',') : ['Queued for AI', 'Processing AI', 'Pending Completion', 'Failed'],
+                sort: p.get('sort') || 'created_at',
+                order: p.get('order') || 'asc'
+            };
+        }
+        
+        function writeUrlParams() {
+            const p = new URLSearchParams();
+            const searchVal = document.getElementById('search-input').value.trim();
+            if (searchVal) p.set('search', searchVal);
+            
+            const activeStatuses = getActiveStatuses();
+            const defaultStatuses = ['Queued for AI', 'Processing AI', 'Pending Completion', 'Failed'];
+            if (JSON.stringify(activeStatuses.sort()) !== JSON.stringify(defaultStatuses.sort())) {
+                p.set('status', activeStatuses.join(','));
+            }
+            
+            if (sortColumn !== 'created_at') p.set('sort', sortColumn);
+            if (sortDir !== 'asc') p.set('order', sortDir);
+            
+            const qs = p.toString();
+            const newUrl = window.location.pathname + (qs ? '?' + qs : '');
+            if (window.location.search !== (qs ? '?' + qs : '')) {
+                window.history.replaceState({}, '', newUrl);
+            }
+        }
+        
+        function applyUrlParams() {
+            const params = readUrlParams();
+            document.getElementById('search-input').value = params.search;
+            sortColumn = params.sort;
+            sortDir = params.order;
+            
+            const chips = document.querySelectorAll('#status-chips .filter-chip');
+            chips.forEach(chip => {
+                const active = params.statuses.includes(chip.dataset.status);
+                if (active) {
+                    chip.classList.remove('inactive');
+                } else {
+                    chip.classList.add('inactive');
+                }
+            });
+            
+            updateClearButton();
+        }
+        
+        function getActiveStatuses() {
+            const chips = document.querySelectorAll('#status-chips .filter-chip');
+            const statuses = [];
+            chips.forEach(chip => {
+                if (!chip.classList.contains('inactive')) {
+                    statuses.push(chip.dataset.status);
+                }
+            });
+            return statuses;
+        }
+        
+        function toggleStatusChip(chip) {
+            chip.classList.toggle('inactive');
+            onFilterChange();
+        }
+        
+        function onFilterChange() {
+            updateClearButton();
+            writeUrlParams();
+            renderJobs();
+        }
+        
+        function clearSearch() {
+            document.getElementById('search-input').value = '';
+            updateClearButton();
+            writeUrlParams();
+            renderJobs();
+        }
+        
+        function updateClearButton() {
+            const btn = document.getElementById('clear-search');
+            const hasText = document.getElementById('search-input').value.trim().length > 0;
+            btn.style.display = hasText ? 'block' : 'none';
+        }
+        
+        function sortBy(column) {
+            if (sortColumn === column) {
+                sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDir = 'asc';
+            }
+            writeUrlParams();
+            renderJobs();
+        }
+        
+        function getSortArrow(column) {
+            if (sortColumn !== column) return '<span class="sort-arrow">↕</span>';
+            return sortDir === 'asc' 
+                ? '<span class="sort-arrow active">▲</span>' 
+                : '<span class="sort-arrow active">▼</span>';
+        }
+        
+        function compareJobs(a, b) {
+            let valA, valB;
+            switch (sortColumn) {
+                case 'path':
+                    valA = a.relative_path.toLowerCase();
+                    valB = b.relative_path.toLowerCase();
+                    break;
+                case 'status':
+                    valA = a.status.toLowerCase();
+                    valB = b.status.toLowerCase();
+                    break;
+                case 'name':
+                    valA = (a.ai_determined_name || '').toLowerCase();
+                    valB = (b.ai_determined_name || '').toLowerCase();
+                    break;
+                case 'confidence':
+                    valA = a.confidence !== null ? a.confidence : -1;
+                    valB = b.confidence !== null ? b.confidence : -1;
+                    break;
+                case 'created_at':
+                default:
+                    valA = a.created_at;
+                    valB = b.created_at;
+                    break;
+            }
+            if (valA < valB) return sortDir === 'asc' ? -1 : 1;
+            if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+            return 0;
         }
         
         async function loadStats() {
@@ -711,82 +1220,103 @@
         async function loadJobs() {
             try {
                 const response = await fetch('/api/jobs');
-                const allJobs = await response.json();
-                
-                // Filter out completed jobs from the display
-                const jobs = allJobs.filter(job => job.status !== 'Completed');
-                
-                const jobsList = document.getElementById('jobs-list');
-                
-                if (jobs.length === 0) {
-                    jobsList.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-icon">📁</div>
-                            <p>No jobs yet. Add files to the downloading folder to get started.</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                let html = `
-                    <table class="jobs-table">
-                        <thead>
-                            <tr>
-                                <th>Original Path</th>
-                                <th>Status</th>
-                                <th>New Name</th>
-                                <th>Confidence</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-                
-                jobs.forEach(job => {
-                    // Build retry info if applicable
-                    let retryInfo = '';
-                    if (job.status === 'FAILED' && job.retry_count !== undefined && job.max_retries !== undefined) {
-                        retryInfo = ` (Attempt ${job.retry_count}/${job.max_retries})`;
-                    }
-                    
-                    // Build error message if applicable
-                    let errorRow = '';
-                    if (job.status === 'FAILED' && job.error_message) {
-                        errorRow = `
-                        <tr>
-                            <td colspan="5" class="error-message">
-                                <strong>Error:</strong> ${job.error_message}
-                            </td>
-                        </tr>
-                        `;
-                    }
-                    
-                    html += `
-                        <tr>
-                            <td>${job.relative_path}</td>
-                            <td><span class="status-badge ${getStatusClass(job.status)}">${job.status}${retryInfo}</span></td>
-                            <td>${job.ai_determined_name || '-'}</td>
-                            <td>${job.confidence !== null ? job.confidence + '%' : '-'}</td>
-                            <td>
-                                <div class="actions">
-                                    <button class="btn btn-edit" onclick="openEditModal('${job.job_id}', '${job.ai_determined_name || job.relative_path}')">Edit</button>
-                                    <button class="btn btn-reai" onclick="openReAIModal('${job.job_id}')">Re-AI</button>
-                                </div>
-                            </td>
-                        </tr>
-                        ${errorRow}
-                    `;
-                });
-                
-                html += `
-                        </tbody>
-                    </table>
-                `;
-                
-                jobsList.innerHTML = html;
+                allJobs = await response.json();
+                renderJobs();
             } catch (error) {
                 console.error('Error loading jobs:', error);
             }
+        }
+        
+        function renderJobs() {
+            const searchTerm = document.getElementById('search-input').value.trim().toLowerCase();
+            const activeStatuses = getActiveStatuses();
+            
+            let filtered = allJobs.filter(job => {
+                if (!activeStatuses.includes(job.status)) return false;
+                if (searchTerm) {
+                    const path = (job.relative_path || '').toLowerCase();
+                    const name = (job.ai_determined_name || '').toLowerCase();
+                    if (!path.includes(searchTerm) && !name.includes(searchTerm)) return false;
+                }
+                return true;
+            });
+            
+            filtered.sort(compareJobs);
+            
+            const jobsList = document.getElementById('jobs-list');
+            const filterCount = document.getElementById('filter-count');
+            filterCount.textContent = `Showing ${filtered.length} of ${allJobs.length} jobs`;
+            
+            if (filtered.length === 0) {
+                let emptyMsg = 'No jobs found matching your filters.';
+                if (allJobs.length === 0) {
+                    emptyMsg = 'No jobs yet. Add files to the downloading folder to get started.';
+                }
+                jobsList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📁</div>
+                        <p>${emptyMsg}</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = `
+                <table class="jobs-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" onclick="sortBy('created_at')"># ${getSortArrow('created_at')}</th>
+                            <th class="sortable" onclick="sortBy('path')">Original Path ${getSortArrow('path')}</th>
+                            <th class="sortable" onclick="sortBy('status')">Status ${getSortArrow('status')}</th>
+                            <th class="sortable" onclick="sortBy('name')">New Name ${getSortArrow('name')}</th>
+                            <th class="sortable" onclick="sortBy('confidence')">Confidence ${getSortArrow('confidence')}</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            filtered.forEach((job, idx) => {
+                let retryInfo = '';
+                if (job.status === 'Failed' && job.retry_count !== undefined && job.max_retries !== undefined) {
+                    retryInfo = ` (Attempt ${job.retry_count}/${job.max_retries})`;
+                }
+                
+                let errorRow = '';
+                if (job.status === 'Failed' && job.error_message) {
+                    errorRow = `
+                    <tr>
+                        <td colspan="6" class="error-message">
+                            <strong>Error:</strong> ${job.error_message}
+                        </td>
+                    </tr>
+                    `;
+                }
+                
+                html += `
+                    <tr>
+                        <td style="color: var(--text-secondary);">${idx + 1}</td>
+                        <td>${job.relative_path}</td>
+                        <td><span class="status-badge ${getStatusClass(job.status)}">${job.status}${retryInfo}</span></td>
+                        <td>${job.ai_determined_name || '-'}</td>
+                        <td>${job.confidence !== null ? job.confidence + '%' : '-'}</td>
+                        <td>
+                            <div class="actions">
+                                <button class="btn btn-edit" onclick="openEditModal('${job.job_id}', '${job.ai_determined_name || job.relative_path}')">Edit</button>
+                                <button class="btn btn-reai" onclick="openReAIModal('${job.job_id}')">Re-AI</button>
+                            </div>
+                        </td>
+                    </tr>
+                    ${errorRow}
+                `;
+            });
+            
+            html += `
+                    </tbody>
+                </table>
+            `;
+            
+            jobsList.innerHTML = html;
         }
         
         function openEditModal(jobId, currentName) {
@@ -849,8 +1379,6 @@
             const includeInstructions = document.getElementById('reai-include-instructions').checked;
             const includeFilename = document.getElementById('reai-include-filename').checked;
             
-            // If instructions are not included but custom prompt is provided,
-            // append JSON formatting instructions
             if (!includeInstructions && customPrompt) {
                 const jsonInstructions = '\n\nIMPORTANT: Return your response as a JSON array with the following structure:\n' +
                     '[{\n' +
@@ -887,6 +1415,138 @@
             }
         }
         
+        let monitorEs = null;
+        let monitorLog = [];
+        
+        function toggleMonitor() {
+            const panel = document.getElementById('ai-monitor');
+            panel.classList.toggle('collapsed');
+            const arrow = panel.querySelector('.toggle-arrow');
+            arrow.textContent = panel.classList.contains('collapsed') ? '▶' : '▼';
+        }
+        
+        function setMonitorStatus(status, text) {
+            const dot = document.getElementById('monitor-dot');
+            const statusText = document.getElementById('monitor-status-text');
+            dot.className = 'monitor-dot ' + status;
+            statusText.textContent = text;
+        }
+        
+        function formatTime(ts) {
+            const d = new Date(ts);
+            return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+        
+        function addMonitorEvent(event) {
+            if (event.type === 'job_started') {
+                monitorLog = [];
+            }
+            monitorLog.push(event);
+            renderMonitorLog();
+        }
+        
+        function renderMonitorLog() {
+            const body = document.getElementById('ai-monitor-body');
+            
+            if (monitorLog.length === 0) {
+                body.innerHTML = '<div class="ai-monitor-empty">Waiting for jobs...</div>';
+                return;
+            }
+            
+            let html = '';
+            for (const ev of monitorLog) {
+                const time = formatTime(ev.ts);
+                let icon = '';
+                let msg = '';
+                
+                switch (ev.type) {
+                    case 'job_started':
+                        icon = '▶';
+                        msg = `Processing: ${ev.file}`;
+                        break;
+                    case 'thinking':
+                        icon = '💭';
+                        msg = ev.message;
+                        break;
+                    case 'api_request':
+                        icon = '📡';
+                        msg = `Sending to ${ev.provider} (${ev.model})`;
+                        if (ev.tools && ev.tools.length) msg += ` [tools: ${ev.tools.join(', ')}]`;
+                        break;
+                    case 'api_response':
+                        icon = '📥';
+                        msg = `Response received`;
+                        if (ev.duration_ms) msg += ` (${ev.duration_ms}ms)`;
+                        if (ev.turn && ev.turn > 1) msg += ` — turn ${ev.turn}`;
+                        break;
+                    case 'tool_started':
+                        icon = '🔧';
+                        msg = `Calling: ${ev.tool}`;
+                        if (ev.args) msg += `(${ev.args})`;
+                        break;
+                    case 'tool_completed':
+                        icon = '✅';
+                        msg = `${ev.tool} complete`;
+                        break;
+                    case 'result':
+                        icon = '⭐';
+                        msg = `Got result (${ev.confidence}% confidence)`;
+                        if (ev.file_count > 1) msg += ` — ${ev.file_count} files`;
+                        break;
+                    case 'job_done':
+                        icon = '✔';
+                        msg = `Job complete`;
+                        if (ev.name) msg += ` → ${ev.name}`;
+                        if (ev.confidence !== undefined) msg += ` (${ev.confidence}%)`;
+                        break;
+                    case 'job_error':
+                        icon = '✖';
+                        msg = `Error: ${ev.error}`;
+                        break;
+                    default:
+                        icon = '·';
+                        msg = JSON.stringify(ev);
+                }
+                
+                html += `<div class="ai-event type-${ev.type}"><span class="event-time">${time}</span><span class="event-icon">${icon}</span><span class="event-msg">${msg}</span></div>`;
+            }
+            
+            body.innerHTML = html;
+            body.scrollTop = body.scrollHeight;
+        }
+        
+        function initMonitor() {
+            setMonitorStatus('idle', 'connecting...');
+            
+            monitorEs = new EventSource('/api/ai-events/stream');
+            
+            monitorEs.onopen = function() {
+                setMonitorStatus('connected', 'connected');
+            };
+            
+            monitorEs.onmessage = function(e) {
+                try {
+                    const event = JSON.parse(e.data);
+                    addMonitorEvent(event);
+                } catch (err) {
+                    console.error('SSE parse error:', err);
+                }
+            };
+            
+            monitorEs.onerror = function() {
+                setMonitorStatus('disconnected', 'disconnected');
+                monitorEs.close();
+                setTimeout(initMonitor, 3000);
+            };
+        }
+        
+        applyUrlParams();
+        
+        if (window.innerWidth <= 768) {
+            document.getElementById('ai-monitor').classList.add('collapsed');
+        }
+        
+        initMonitor();
         loadJobs();
         loadStats();
         

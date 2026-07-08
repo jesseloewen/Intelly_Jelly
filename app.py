@@ -1,10 +1,11 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, send_from_directory, session, redirect, url_for, Response
 import threading
 import os
 import logging
 import secrets
 import hashlib
 import json
+import queue
 from functools import wraps
 from datetime import datetime, timedelta
 
@@ -491,6 +492,33 @@ def get_movement_stats():
     except Exception as e:
         logger.error(f"Error retrieving movement stats: {type(e).__name__}: {e}", exc_info=True)
         return jsonify({'error': 'Failed to retrieve movement stats'}), 500
+
+
+@app.route('/api/ai-events/stream', methods=['GET'])
+def ai_events_stream():
+    def generate():
+        q = orchestrator.ai_sse_broker.subscribe()
+        try:
+            while True:
+                try:
+                    event = q.get(timeout=15)
+                    yield f"data: {json.dumps(event)}\n\n"
+                except queue.Empty:
+                    yield ": heartbeat\n\n"
+        except GeneratorExit:
+            pass
+        finally:
+            orchestrator.ai_sse_broker.unsubscribe(q)
+    
+    return Response(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+            'Connection': 'keep-alive'
+        }
+    )
 
 
 @app.route('/api/library/files', methods=['GET'])
