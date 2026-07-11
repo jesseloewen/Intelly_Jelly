@@ -25,6 +25,7 @@ config.json
 *.egg
 file_movements.json
 instruction_prompt_custom.md
+pending_jobs.json
 
 # Authentication tokens
 tokens.json

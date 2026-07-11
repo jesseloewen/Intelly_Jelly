@@ -370,3 +370,53 @@ class LibraryBrowser:
             info['subtitle_path'] = subtitle_path
         
         return info
+    
+    def search_library(self, query: str, category: Optional[str] = None, max_results: int = 20) -> List[Dict]:
+        """Search the media library for files matching query. Designed for AI tool use.
+        
+        Args:
+            query: Substring to match against filename and relative_path.
+            category: Optional folder filter. One of: movies, tv, books, comics, 
+                      audiobooks, music, software, other, all (or None for everywhere).
+            max_results: Maximum results to return (default 20).
+            
+        Returns:
+            Compact list of {filename, relative_path} dicts.
+        """
+        if not os.path.exists(self.library_path):
+            return []
+        
+        category_prefixes = {
+            'movies': 'Movies' + os.sep,
+            'tv': 'TV Shows' + os.sep,
+            'tv_shows': 'TV Shows' + os.sep,
+            'books': 'Books' + os.sep,
+            'comics': 'Books' + os.sep + 'Comics' + os.sep,
+            'audiobooks': 'Books' + os.sep + 'Audiobooks' + os.sep,
+            'music': 'Music' + os.sep,
+            'software': 'Software' + os.sep,
+            'other': 'Other' + os.sep,
+        }
+        
+        all_files = self._get_all_files()
+        query_lower = query.lower()
+        results = []
+        
+        for f in all_files:
+            if query_lower not in f['filename'].lower() and query_lower not in f['relative_path'].lower():
+                continue
+            
+            if category and category.lower() in category_prefixes:
+                prefix = category_prefixes[category.lower()]
+                if not f['relative_path'].startswith(prefix):
+                    continue
+            
+            results.append({
+                'filename': f['filename'],
+                'relative_path': f['relative_path'],
+            })
+            
+            if len(results) >= max_results:
+                break
+        
+        return results

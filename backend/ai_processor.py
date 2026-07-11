@@ -15,8 +15,10 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
 class AIProcessor:
-    def __init__(self, config_manager):
+    def __init__(self, config_manager, library_browser=None, job_store=None):
         self.config_manager = config_manager
+        self.library_browser = library_browser
+        self.job_store = job_store
         self.last_api_call_time = 0
         self.openai_client = None
         self.openrouter_client = None
@@ -447,6 +449,104 @@ class AIProcessor:
             }
         ]
     
+    def _get_library_tool_definition_google(self) -> Optional[Dict]:
+        if not self.library_browser:
+            return None
+        return {
+            "function_declarations": [
+                {
+                    "name": "search_library",
+                    "description": "Search the media library for existing files and folders. Use this to check for duplicates, verify existing folder structures, or find similarly-named files before suggesting a name. Returns matching filenames and paths. Use the category parameter to narrow results to a specific media type.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "Search term to match against filenames and paths in the library"
+                            },
+                            "category": {
+                                "type": "string",
+                                "description": "Optional. Narrow search to a specific folder: 'movies', 'tv', 'books', 'comics', 'audiobooks', 'music', 'software', 'other'. Omit to search everywhere."
+                            }
+                        },
+                        "required": ["query"]
+                    }
+                }
+            ]
+        }
+    
+    def _get_library_tools_for_openai(self) -> List[Dict]:
+        if not self.library_browser:
+            return []
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_library",
+                    "description": "Search the media library for existing files and folders. Use this to check for duplicates, verify existing folder structures, or find similarly-named files before suggesting a name. Returns matching filenames and paths. Use the category parameter to narrow results to a specific media type.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "Search term to match against filenames and paths in the library"
+                            },
+                            "category": {
+                                "type": "string",
+                                "description": "Optional. Narrow search to a specific folder: 'movies', 'tv', 'books', 'comics', 'audiobooks', 'music', 'software', 'other'. Omit to search everywhere."
+                            }
+                        },
+                        "required": ["query"]
+                    }
+                }
+            }
+        ]
+    
+    def _get_pending_tool_definition_google(self) -> Optional[Dict]:
+        if not self.job_store:
+            return None
+        return {
+            "function_declarations": [
+                {
+                    "name": "search_pending_jobs",
+                    "description": "Search currently pending AI-generated file names. Use this to ensure naming consistency with other files that are waiting to be organized. For example, check how other episodes of the same TV show have been named.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "Search term to match against pending file paths and AI-generated names"
+                            }
+                        },
+                        "required": ["query"]
+                    }
+                }
+            ]
+        }
+    
+    def _get_pending_tools_for_openai(self) -> List[Dict]:
+        if not self.job_store:
+            return []
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_pending_jobs",
+                    "description": "Search currently pending AI-generated file names. Use this to ensure naming consistency with other files that are waiting to be organized. For example, check how other episodes of the same TV show have been named.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "Search term to match against pending file paths and AI-generated names"
+                            }
+                        },
+                        "required": ["query"]
+                    }
+                }
+            }
+        ]
+    
     def _execute_tmdb_function(self, function_name: str, args: Dict) -> str:
         """Execute a TMDB or Open Library function call and return formatted response."""
         client = self._get_tmdb_client()
@@ -507,6 +607,31 @@ class AIProcessor:
                 elif function_name == "search_comic_issue":
                     result = cv_client.search_issue(args.get("issue_name", ""))
                     return format_comicvine_response(result, "issue")
+            
+            elif function_name == "search_library":
+                if not self.library_browser:
+                    return "Library search tool is not available"
+                if not os.path.exists(self.library_browser.library_path):
+                    return "Library path does not exist"
+                results = self.library_browser.search_library(
+                    args.get("query", ""),
+                    category=args.get("category"),
+                    max_results=20
+                )
+                if not results:
+                    return "No matching files found in library"
+                return json.dumps(results, indent=2)
+            
+            elif function_name == "search_pending_jobs":
+                if not self.job_store:
+                    return "Pending jobs search tool is not available"
+                results = self.job_store.search_pending_jobs(
+                    args.get("query", ""),
+                    max_results=15
+                )
+                if not results:
+                    return "No matching pending jobs found"
+                return json.dumps(results, indent=2)
             
             else:
                 return f"Unknown function: {function_name}"
@@ -582,19 +707,19 @@ class AIProcessor:
         
         return prompt
 
-    def process_single(self, file_path: str, custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, on_event: Optional[Callable] = None) -> Optional[Dict]:
+    def process_single(self, file_path: str, custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> Optional[Dict]:
         """Process a single file using configured AI with optional web search and tools."""
         logger.info(f"Starting AI processing for file: {file_path}")
-        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}, ComicVine tool: {enable_comicvine_tool}")
+        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}, ComicVine tool: {enable_comicvine_tool}, Library tool: {enable_library_tool}, Pending tool: {enable_pending_tool}")
         
-        results = self.process_batch([file_path], custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, on_event=on_event)
+        results = self.process_batch([file_path], custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, on_event=on_event)
         return results[0] if results else None
     
-    def process_batch(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def process_batch(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using configured AI provider with optional web search and tools."""
         logger.info(f"Starting AI processing for {len(file_paths)} file(s)")
         logger.debug(f"Files to process: {file_paths}")
-        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}, ComicVine tool: {enable_comicvine_tool}")
+        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}, ComicVine tool: {enable_comicvine_tool}, Library tool: {enable_library_tool}, Pending tool: {enable_pending_tool}")
         
         # Override enable_tmdb_tool based on actual config state (if not explicitly disabled)
         if enable_tmdb_tool:
@@ -615,19 +740,31 @@ class AIProcessor:
                 logger.warning("Comic Vine tool requested but not enabled in config, disabling for this request")
                 enable_comicvine_tool = False
         
+        if enable_library_tool:
+            library_enabled_in_config = self.config_manager.get('ENABLE_LIBRARY_TOOL', False)
+            if not library_enabled_in_config:
+                logger.warning("Library tool requested but not enabled in config, disabling for this request")
+                enable_library_tool = False
+        
+        if enable_pending_tool:
+            pending_enabled_in_config = self.config_manager.get('ENABLE_PENDING_TOOL', False)
+            if not pending_enabled_in_config:
+                logger.warning("Pending tool requested but not enabled in config, disabling for this request")
+                enable_pending_tool = False
+        
         provider = self.config_manager.get('AI_PROVIDER', 'google')
         logger.info(f"Using AI provider: {provider}")
         
         if provider == 'openai':
-            return self._process_batch_openai(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, on_event=on_event)
+            return self._process_batch_openai(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, on_event=on_event)
         elif provider == "openrouter":
-            return self._process_batch_openrouter(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, on_event=on_event)
+            return self._process_batch_openrouter(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, on_event=on_event)
         elif provider == "ollama":
-            return self._process_batch_ollama(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, on_event=on_event)
+            return self._process_batch_ollama(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, on_event=on_event)
         elif provider == "google" or provider == "custom":
-            return self._process_batch_google(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, on_event=on_event)
+            return self._process_batch_google(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, on_event=on_event)
     
-    def _process_batch_google(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def _process_batch_google(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using Google AI with optional web search and tools."""
         api_key = self.config_manager.get('GOOGLE_API_KEY', '')
         if not api_key:
@@ -679,6 +816,16 @@ class AIProcessor:
             if cv_tool:
                 tools.append(cv_tool)
         
+        if enable_library_tool:
+            lib_tool = self._get_library_tool_definition_google()
+            if lib_tool:
+                tools.append(lib_tool)
+        
+        if enable_pending_tool:
+            pend_tool = self._get_pending_tool_definition_google()
+            if pend_tool:
+                tools.append(pend_tool)
+        
         if tools:
             payload["tools"] = tools
         
@@ -699,6 +846,9 @@ class AIProcessor:
                 if enable_web_search: tools_active.append("web_search")
                 if enable_tmdb_tool: tools_active.append("tmdb")
                 if enable_openlibrary_tool: tools_active.append("openlibrary")
+                if enable_comicvine_tool: tools_active.append("comicvine")
+                if enable_library_tool: tools_active.append("library")
+                if enable_pending_tool: tools_active.append("pending")
                 on_event({"type": "api_request", "provider": "google", "model": model, "tools": tools_active})
             
             logger.debug(f"API URL: {url.split('?')[0]}")  # Log URL without API key
@@ -719,7 +869,7 @@ class AIProcessor:
             
             # Handle multi-turn conversation for function calling
             conversation_history = payload["contents"].copy()
-            max_turns = 10  # Prevent infinite loops
+            max_turns = 30  # Prevent infinite loops
             
             for turn in range(max_turns):
                 req_start = time.time()
@@ -855,7 +1005,7 @@ class AIProcessor:
                 on_event({"type": "error", "message": str(e)})
             raise
 
-    def _process_batch_openai(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def _process_batch_openai(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using OpenAI with optional web search."""
         api_key = self.config_manager.get('OPENAI_API_KEY', '')
         if not api_key:
@@ -889,6 +1039,9 @@ class AIProcessor:
                 if enable_web_search: tools_active.append("web_search")
                 if enable_tmdb_tool: tools_active.append("tmdb")
                 if enable_openlibrary_tool: tools_active.append("openlibrary")
+                if enable_comicvine_tool: tools_active.append("comicvine")
+                if enable_library_tool: tools_active.append("library")
+                if enable_pending_tool: tools_active.append("pending")
                 on_event({"type": "api_request", "provider": "openai", "model": model, "tools": tools_active})
             
             # Build tools list - only TMDB supported (web search not available in standard OpenAI API)
@@ -916,6 +1069,18 @@ class AIProcessor:
                     tools.extend(cv_tools)
                     use_chat_api = True
             
+            if enable_library_tool:
+                lib_tools = self._get_library_tools_for_openai()
+                if lib_tools:
+                    tools.extend(lib_tools)
+                use_chat_api = True
+            
+            if enable_pending_tool:
+                pend_tools = self._get_pending_tools_for_openai()
+                if pend_tools:
+                    tools.extend(pend_tools)
+                use_chat_api = True
+            
             # Log full request
             logger.info("=" * 80)
             logger.info("OPENAI API REQUEST")
@@ -942,7 +1107,7 @@ class AIProcessor:
             if use_chat_api:
                 # Use chat.completions API for function calling support with multi-turn conversation
                 messages = [{"role": "user", "content": prompt}]
-                max_turns = 10
+                max_turns = 30
                 turn = 0
                 
                 while turn < max_turns:
@@ -1088,7 +1253,7 @@ class AIProcessor:
                 on_event({"type": "error", "message": str(e)})
             raise
 
-    def _process_batch_openrouter(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def _process_batch_openrouter(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using OpenRouter (OpenAI-compatible API)."""
         api_key = self.config_manager.get('OPENROUTER_API_KEY', '')
         if not api_key:
@@ -1122,6 +1287,9 @@ class AIProcessor:
                 if enable_web_search: tools_active.append("web_search")
                 if enable_tmdb_tool: tools_active.append("tmdb")
                 if enable_openlibrary_tool: tools_active.append("openlibrary")
+                if enable_comicvine_tool: tools_active.append("comicvine")
+                if enable_library_tool: tools_active.append("library")
+                if enable_pending_tool: tools_active.append("pending")
                 on_event({"type": "api_request", "provider": "openrouter", "model": model, "tools": tools_active})
             
             tools = []
@@ -1148,6 +1316,18 @@ class AIProcessor:
                     tools.extend(cv_tools)
                     use_tools = True
             
+            if enable_library_tool:
+                lib_tools = self._get_library_tools_for_openai()
+                if lib_tools:
+                    tools.extend(lib_tools)
+                    use_tools = True
+            
+            if enable_pending_tool:
+                pend_tools = self._get_pending_tools_for_openai()
+                if pend_tools:
+                    tools.extend(pend_tools)
+                    use_tools = True
+            
             logger.info("=" * 80)
             logger.info("OPENROUTER API REQUEST")
             logger.info("=" * 80)
@@ -1167,7 +1347,7 @@ class AIProcessor:
             messages = [{"role": "user", "content": prompt}]
             
             if use_tools:
-                max_turns = 10
+                max_turns = 30
                 turn = 0
                 
                 while turn < max_turns:
@@ -1367,7 +1547,7 @@ class AIProcessor:
             logger.error(f"Unexpected error fetching Ollama models: {e}")
             return ["Error: Failed to fetch models"]
     
-    def _process_batch_ollama(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def _process_batch_ollama(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using Ollama."""
         base_url = self.config_manager.get('OLLAMA_BASE_URL', 'http://localhost:11434')
         if not base_url:
@@ -1401,6 +1581,18 @@ class AIProcessor:
                 tmdb_tools = []
             tmdb_tools.extend(cv_tools)
         
+        if enable_library_tool:
+            lib_tools = self._get_library_tools_for_openai()
+            if not enable_tmdb_tool and not enable_openlibrary_tool and not enable_comicvine_tool:
+                tmdb_tools = []
+            tmdb_tools.extend(lib_tools)
+        
+        if enable_pending_tool:
+            pend_tools = self._get_pending_tools_for_openai()
+            if not enable_tmdb_tool and not enable_openlibrary_tool and not enable_comicvine_tool and not enable_library_tool:
+                tmdb_tools = []
+            tmdb_tools.extend(pend_tools)
+        
         try:
             # Enforce delay between API calls
             delay_seconds = self.config_manager.get('AI_CALL_DELAY_SECONDS', 2)
@@ -1417,6 +1609,9 @@ class AIProcessor:
                 tools_active = []
                 if enable_tmdb_tool: tools_active.append("tmdb")
                 if enable_openlibrary_tool: tools_active.append("openlibrary")
+                if enable_comicvine_tool: tools_active.append("comicvine")
+                if enable_library_tool: tools_active.append("library")
+                if enable_pending_tool: tools_active.append("pending")
                 on_event({"type": "api_request", "provider": "ollama", "model": model, "tools": tools_active})
             
             # Log full request

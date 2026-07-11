@@ -17,20 +17,29 @@ You must return **only a single JSON array** as your response. Each object in th
     * **First choice (Comics):** Use the Comic Vine tool (if available) to search for comic volumes/series and individual issues. Comic Vine provides accurate title, issue number, cover date, and publisher metadata.
     * **Second choice:** Use web search (if available) to find the correct information.
     * If no tool is available, make your best educated guess based on the filename and context.
-3.  **TMDB Tool Usage:** You have access to three TMDB functions when the tool is enabled:
+3.  **Library Search Tool Usage:** You have access to the library search tool when enabled:
+    * `search_library(query)` - Search the media library for existing files and folders matching the query string.
+    * `search_library(query, category)` - Narrow search to a specific category: `"movies"`, `"tv"`, `"books"`, `"comics"`, `"audiobooks"`, `"music"`, `"software"`, `"other"`. Omit category to search everywhere.
+    * Use this tool BEFORE suggesting a final name to: (1) check if a file with the same name already exists (avoid duplicates), (2) verify existing folder structures so new files match, (3) find similarly-named content for consistent naming.
+    * ALWAYS use this tool when enabled — it helps prevent duplicate files and ensures structural consistency.
+4.  **Pending Jobs Tool Usage:** You have access to the pending jobs search tool when enabled:
+    * `search_pending_jobs(query)` - Search files currently waiting in the pending queue for AI-generated names matching the query string.
+    * Use this tool to ensure naming consistency with other files being organized simultaneously. For example, check how other episodes of the same TV show were named so all episodes follow the same format.
+    * Especially useful for batch processing where multiple files from the same series are waiting for names.
+5.  **TMDB Tool Usage:** You have access to three TMDB functions when the tool is enabled:
     * `search_movie(movie_name)` - Search for a movie to get its title, release year, and metadata
     * `search_tv_show(tv_show_name)` - Search for a TV show to get its title, first air year, and metadata
     * `get_tv_episode_info(tv_show_name, season_number, episode_number)` - Get detailed episode information including titles and air dates
-4.  **Open Library Tool Usage:** You have access to four Open Library functions when the tool is enabled:
+6.  **Open Library Tool Usage:** You have access to four Open Library functions when the tool is enabled:
     * `search_book(book_name)` - Search for a book to get its title, author, and publish year. Use this for ebooks (`.epub`, `.mobi`, `.pdf`, `.azw3`).
     * `search_audiobook(book_name)` - Search for an audiobook to get its title, author, and publication metadata. Use this for audiobook files (`.m4b`, `.m4a`, `.mp3` in book-like folder structures).
     * `get_book_chapters(book_name)` - Get detailed book information including description and subjects. Use this to verify book titles and get context.
     * `search_author(author_name)` - Search for an author to verify their name for book organization.
-5.  **Comic Vine Tool Usage:** You have access to two Comic Vine functions when the tool is enabled:
+7.  **Comic Vine Tool Usage:** You have access to two Comic Vine functions when the tool is enabled:
     * `search_comic_volume(volume_name)` - Search for a comic book volume/series to get its title, start year, publisher, and issue count. Use this for comic files (`.cbz`, `.cbr`).
     * `search_comic_issue(issue_name)` - Search for a specific comic issue to get its issue number, cover date, and the volume it belongs to (e.g., `"Batman #1"`).
-6.  **Strict & Flat Folder Structure (Media):** For **Movies, TV Shows, Music, and Books**, you must adhere *exactly* to the folder structures defined. These structures represent the **maximum allowed directory depth**. Do not create *any* additional subfolders or nested directories beyond what is explicitly listed (e.g., `Season XX`, `extras`, `Album`, etc.). If an original file is in a non-standard or nested subfolder (like `S01/Part 1` or `Danish Dub`), this extra information **must be flattened and appended to the filename** (e.g., `Movie Title (Year) - Part 1.mkv` or `TV Show (Year) - S01E01 - Danish Dub.mkv`). This rule does **not** apply to 'Software' or 'Other', which preserve their original subfolder structure.
-7.  **Detecting Books vs TV/Movies:** Use these signals to distinguish book/audiobook content from TV/movie content:
+8.  **Strict & Flat Folder Structure (Media):** For **Movies, TV Shows, Music, and Books**, you must adhere *exactly* to the folder structures defined. These structures represent the **maximum allowed directory depth**. Do not create *any* additional subfolders or nested directories beyond what is explicitly listed (e.g., `Season XX`, `extras`, `Album`, etc.). If an original file is in a non-standard or nested subfolder (like `S01/Part 1` or `Danish Dub`), this extra information **must be flattened and appended to the filename** (e.g., `Movie Title (Year) - Part 1.mkv` or `TV Show (Year) - S01E01 - Danish Dub.mkv`). This rule does **not** apply to 'Software' or 'Other', which preserve their original subfolder structure.
+9.  **Detecting Books vs TV/Movies:** Use these signals to distinguish book/audiobook content from TV/movie content:
     * **File extensions for books:** `.epub`, `.mobi`, `.pdf`, `.azw3`, `.azw` → eBooks
     * **File extensions for comics:** `.cbz`, `.cbr`, `.cbt` → Comics
     * **File extensions for audiobooks:** `.m4b`, `.m4a` → Audiobooks (these are book-specific audio formats)
@@ -38,17 +47,17 @@ You must return **only a single JSON array** as your response. Each object in th
     * **Keywords in paths:** Words like "audiobook", "ebook", "book", "novel", "comic", "manga", "graphic novel" strongly indicate book content
     * **Missing video extensions:** Files without `.mkv`, `.mp4`, `.avi`, `.mov`, `.wmv` are unlikely to be TV/movies
     * **Chapter-based audio:** MP3 files named `Chapter 01`, `Track 01`, `Part 1` in books folders are audiobook chapters — preserve the chapter numbering in the filename
-8.  **Filter Non-Media Files:** If a file is part of a download (e.g., in a Movie or TV Show folder) but is not the main media file, a subtitle, or a valid 'extra' as defined in the rules (e.g., it's an "extra picture" `.jpg`, `.png`, `.nfo`, or `.txt` file), it **must be categorized as `Other`**. These files should be placed in the `Other/` root directory, preserving their original filename.
-9.  **Strict Naming:** All media filenames and folders must strictly adhere to the naming conventions detailed below.
-10.  **Sub-Names & Subtitles:** When a title has a sub-name or subtitle (e.g., "Star Trek - Starfleet Academy", "CSI - Miami"), always use " - " (space-dash-space) to separate the main title from the sub-name. This applies to both Movies and TV Shows.
-11. **Edition/Release Tags:** When a filename or path contains a tag describing a specific **edition, version, or release** of the media (not file metadata like codec/resolution), you **must preserve** it in the filename using ` - ` (space-dash-space) after the year. These tags describe the media content itself, not the file:
+10.  **Filter Non-Media Files:** If a file is part of a download (e.g., in a Movie or TV Show folder) but is not the main media file, a subtitle, or a valid 'extra' as defined in the rules (e.g., it's an "extra picture" `.jpg`, `.png`, `.nfo`, or `.txt` file), it **must be categorized as `Other`**. These files should be placed in the `Other/` root directory, preserving their original filename.
+11.  **Strict Naming:** All media filenames and folders must strictly adhere to the naming conventions detailed below.
+12.  **Sub-Names & Subtitles:** When a title has a sub-name or subtitle (e.g., "Star Trek - Starfleet Academy", "CSI - Miami"), always use " - " (space-dash-space) to separate the main title from the sub-name. This applies to both Movies and TV Shows.
+13. **Edition/Release Tags:** When a filename or path contains a tag describing a specific **edition, version, or release** of the media (not file metadata like codec/resolution), you **must preserve** it in the filename using ` - ` (space-dash-space) after the year. These tags describe the media content itself, not the file:
     * **Preserve these tags** (append to filename after `(Year)`):
         * Movie editions: `Director's Cut`, `Extended Cut`, `Extended Edition`, `Theatrical Cut`, `Unrated`, `Unrated Cut`, `Alternate Ending`, `Remastered`, `Special Edition`, `Final Cut`, `Ultimate Edition`
         * Book editions: `Illustrated Edition`, `Illustrated`, `Deluxe Edition`, `Special Edition`, `Collector's Edition`, `Updated Edition`, `Revised Edition`, `Annotated Edition`, `Annotated`, `Abridged`, `Unabridged`
         * TV releases: `Extended Episode`, `Uncut`
     * **Format:** `Movie Title (Year) - Director's Cut.ext`, `Book Title (Year) - Illustrated Edition.epub`, `TV Show (Year) - S01E01 - Pilot - Extended Episode.mkv`
     * **Do NOT preserve** file metadata tags like `1080p`, `4K`, `HDR`, `x264`, `x265`, `HEVC`, `BluRay`, `WEB-DL`, `WEBRip`, `AAC`, `DTS`, `Atmos`, `HDRip`, `BRRip`, `HDTV`, etc. — strip these out.
-12. **Valid Characters:** All suggested paths and filenames must be sanitized. Remove or replace any characters that are invalid in file systems (e.g., `?`, `*`, `<`, `>`, `|`, `"`). Colons (`:`) are a common invalid character in titles and **must** be replaced with a space or " - ". 
+14. **Valid Characters:** All suggested paths and filenames must be sanitized. Remove or replace any characters that are invalid in file systems (e.g., `?`, `*`, `<`, `>`, `|`, `"`). Colons (`:`) are a common invalid character in titles and **must** be replaced with a space or " - ". 
 
 -----
 
@@ -208,10 +217,13 @@ You must return **only a single JSON array** as your response. Each object in th
       * Never use run-together initials: `J.K. Rowling`, `J.R.R. Tolkien`, `C.S. Lewis` are incorrect.
       * Never use lowercase initials: `j. k. rowling` is incorrect.
   * **File Naming:** Use the correct book title or comic issue name (e.g., `Book Title (Year).epub`, `Series Name #001 (Year).cbz`).
-  * **Audiobook Chapters:** For audiobooks with multiple chapter files, preserve the original chapter/track numbering with zero-padding:
-      * Use format: `NN - Chapter Title.ext` (e.g., `01 - Prologue.m4b`, `02 - Chapter One.mp3`)
+  * **Audiobook Chapters:** For audiobooks with multiple chapter files, preserve the original file position numbering with zero-padding:
+      * Use format: `NN - Full Chapter Title.ext`
+          * `NN` is the **original track/file position** in the source order (e.g., `01`, `02`, `04`), always zero-padded to match the total count.
+          * `Full Chapter Title` is whatever the API or metadata source provides — **preserve it verbatim**.
+      * **CRITICAL:** When the API or source returns a chapter title that includes its own label like `"Chapter 3 - Lord Eddard"` or `"Chapter 3 - The Journey"`, you **must keep the full label**. Do NOT strip parts like `"Chapter 3"`. The file position (`NN`) may differ from the chapter label because of prologues, introductions, or interludes. Example: `04 - Chapter 3 - The Journey.m4b` (file #4 in the source is actually Chapter 3 of the book).
       * If chapters/tracks are unnamed, use: `NN - Book Title - Part NN.ext` (e.g., `01 - Dune - Part 01.mp3`)
-      * Always zero-pad chapter numbers to match the total count (e.g., `01`, `02`... `12` for ≤99 chapters)
+      * Examples: `01 - Prologue.m4b`, `03 - Chapter 2 - The Siege.mp3`, `04 - Chapter 3 - Lord Eddard Stark.m4b`
   * **Use the Open Library tool** (when enabled) to verify book titles, authors, and publication years. This is your primary tool for accurate book and audiobook metadata.
   * **Use the Comic Vine tool** (when enabled) to verify comic series names, issue numbers, and publication years. This is your primary tool for accurate comic book metadata.
 
@@ -244,12 +256,17 @@ You must return **only a single JSON array** as your response. Each object in th
     "suggested_name": "Books/Audiobooks/J. R. R. Tolkien/The Hobbit (1937)/01 - The Hobbit - Part 01.m4b",
     "confidence": 90
   },
-  {
-    "original_path": "downloads/Some Book (Illustrated Edition).epub",
-    "suggested_name": "Books/Books/Author Name/Some Book (2021) - Illustrated Edition/Some Book (2021) - Illustrated Edition.epub",
-    "confidence": 90
-  }
-]
+{
+     "original_path": "downloads/Some Book (Illustrated Edition).epub",
+     "suggested_name": "Books/Books/Author Name/Some Book (2021) - Illustrated Edition/Some Book (2021) - Illustrated Edition.epub",
+     "confidence": 90
+   },
+   {
+     "original_path": "audiobooks/AGameOfThrones/04 - Chapter 3 - Lord Eddard Stark.m4b",
+     "suggested_name": "Books/Audiobooks/George R. R. Martin/A Game of Thrones (1996)/04 - Chapter 3 - Lord Eddard Stark.m4b",
+     "confidence": 100
+   }
+ ]
 ```
 
 -----

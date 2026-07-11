@@ -190,6 +190,11 @@
             color: white;
         }
         
+        .btn-overwrite {
+            background: #e17055;
+            color: white;
+        }
+        
         .modal {
             display: none;
             position: fixed;
@@ -1304,6 +1309,7 @@
                             <div class="actions">
                                 <button class="btn btn-edit" onclick="openEditModal('${job.job_id}', '${job.ai_determined_name || job.relative_path}')">Edit</button>
                                 <button class="btn btn-reai" onclick="openReAIModal('${job.job_id}')">Re-AI</button>
+                                ${job.destination_exists && job.status === 'Pending Completion' ? `<button class="btn btn-overwrite" onclick="forceOverwriteJob('${job.job_id}')" title="Overwrite existing file in library">Overwrite</button>` : ''}
                             </div>
                         </td>
                     </tr>
@@ -1412,6 +1418,26 @@
             } catch (error) {
                 console.error('Error saving re-AI:', error);
                 alert('Error queuing job for re-processing');
+            }
+        }
+        
+        async function forceOverwriteJob(jobId) {
+            if (!confirm('This will overwrite the existing file in the library. Continue?')) return;
+            
+            try {
+                const response = await fetch(`/api/jobs/${jobId}/force-overwrite`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    loadJobs();
+                    loadStats();
+                } else {
+                    alert('Error setting overwrite flag');
+                }
+            } catch (error) {
+                console.error('Error force overwriting:', error);
+                alert('Error setting overwrite flag');
             }
         }
         

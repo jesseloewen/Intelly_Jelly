@@ -60,6 +60,8 @@ class ConfigManager:
             "ENABLE_TMDB_TOOL": False,
             "ENABLE_OPENLIBRARY_TOOL": False,
             "ENABLE_COMICVINE_TOOL": False,
+            "ENABLE_LIBRARY_TOOL": True,
+            "ENABLE_PENDING_TOOL": True,
             "AI_CALL_DELAY_SECONDS": 2,
             "JELLYFIN_REFRESH_ENABLED": False,
             "APP_PASSWORD": "",

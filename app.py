@@ -46,8 +46,8 @@ app.secret_key = os.urandom(24)  # Generate a secret key for sessions
 config_manager = ConfigManager()
 job_store = JobStore()
 orchestrator = BackendOrchestrator(config_manager, job_store)
-ai_processor = AIProcessor(config_manager)
 library_browser = LibraryBrowser(config_manager.get('LIBRARY_PATH', './test_folders/library'))
+ai_processor = AIProcessor(config_manager, library_browser=library_browser, job_store=job_store)
 
 backend_thread = None
 
@@ -337,6 +337,22 @@ def edit_job(job_id):
         return jsonify({'error': 'Internal server error'}), 500
 
 
+@app.route('/api/jobs/<job_id>/force-overwrite', methods=['POST'])
+def force_overwrite_job(job_id):
+    logger.info(f"API: Force overwrite request for job_id={job_id}")
+    try:
+        success = orchestrator.force_overwrite_job(job_id)
+        
+        if success:
+            logger.info(f"Job {job_id} force overwrite triggered")
+            return jsonify({'success': True, 'message': 'Overwrite flag set'})
+        logger.warning(f"Job {job_id} not found or not pending for force overwrite")
+        return jsonify({'error': 'Job not found or not pending completion'}), 404
+    except Exception as e:
+        logger.error(f"Error force overwriting job {job_id}: {type(e).__name__}: {e}", exc_info=True)
+        return jsonify({'error': 'Internal server error'}), 500
+
+
 @app.route('/api/jobs/<job_id>/re-ai', methods=['POST'])
 def re_ai_job(job_id):
     logger.info(f"API: Re-AI job request for job_id={job_id}")
@@ -417,7 +433,9 @@ def update_config():
         'ENABLE_WEB_SEARCH',
         'ENABLE_TMDB_TOOL',
         'ENABLE_OPENLIBRARY_TOOL',
-        'ENABLE_COMICVINE_TOOL',
+'ENABLE_COMICVINE_TOOL',
+        'ENABLE_LIBRARY_TOOL',
+        'ENABLE_PENDING_TOOL',
         'AI_CALL_DELAY_SECONDS',
         'JELLYFIN_REFRESH_ENABLED',
         'APP_PASSWORD',

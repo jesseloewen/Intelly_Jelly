@@ -11,6 +11,7 @@ from pathlib import Path
 from backend.job_store import JobStore, JobStatus
 from backend.config_manager import ConfigManager
 from backend.ai_processor import AIProcessor
+from backend.library_browser import LibraryBrowser
 from backend.file_watcher import (
     FileWatcher, 
     DownloadingFolderHandler,
@@ -26,7 +27,8 @@ class BackendOrchestrator:
     def __init__(self, config_manager: ConfigManager, job_store: JobStore):
         self.config_manager = config_manager
         self.job_store = job_store
-        self.ai_processor = AIProcessor(config_manager)
+        self.library_browser = LibraryBrowser(config_manager.get('LIBRARY_PATH', './test_folders/library'))
+        self.ai_processor = AIProcessor(config_manager, library_browser=self.library_browser, job_store=self.job_store)
         self.file_movement_logger = FileMovementLogger()
         self.ai_sse_broker = AISSEBroker()
         
@@ -55,6 +57,10 @@ class BackendOrchestrator:
         
         logger.info(f"Monitoring downloading folder: {downloading_path}")
         logger.info(f"Monitoring completed folder: {completed_path}")
+        
+        loaded = self.job_store.load_pending_jobs(downloading_path, completed_path)
+        if loaded > 0:
+            logger.info(f"Restored {loaded} pending job(s) from disk, skipping re-scan for those files")
         
         downloading_handler = DownloadingFolderHandler(self._on_file_detected, downloading_path)
         self.downloading_watcher = FileWatcher(downloading_path, downloading_handler)
@@ -307,6 +313,9 @@ class BackendOrchestrator:
             enable_web_search = getattr(primary_job, 'enable_web_search', self.config_manager.get('ENABLE_WEB_SEARCH', False))
             enable_tmdb_tool = getattr(primary_job, 'enable_tmdb_tool', self.config_manager.get('ENABLE_TMDB_TOOL', False))
             enable_openlibrary_tool = getattr(primary_job, 'enable_openlibrary_tool', self.config_manager.get('ENABLE_OPENLIBRARY_TOOL', False))
+            enable_comicvine_tool = getattr(primary_job, 'enable_comicvine_tool', self.config_manager.get('ENABLE_COMICVINE_TOOL', False))
+            enable_library_tool = getattr(primary_job, 'enable_library_tool', self.config_manager.get('ENABLE_LIBRARY_TOOL', False)) if hasattr(primary_job, 'enable_library_tool') else self.config_manager.get('ENABLE_LIBRARY_TOOL', False)
+            enable_pending_tool = getattr(primary_job, 'enable_pending_tool', self.config_manager.get('ENABLE_PENDING_TOOL', False)) if hasattr(primary_job, 'enable_pending_tool') else self.config_manager.get('ENABLE_PENDING_TOOL', False)
             
             file_paths = [job.relative_path for job in jobs]
             results = self.ai_processor.process_batch(
@@ -317,6 +326,9 @@ class BackendOrchestrator:
                 enable_web_search=enable_web_search,
                 enable_tmdb_tool=enable_tmdb_tool,
                 enable_openlibrary_tool=enable_openlibrary_tool,
+                enable_comicvine_tool=enable_comicvine_tool,
+                enable_library_tool=enable_library_tool,
+                enable_pending_tool=enable_pending_tool,
                 on_event=self.ai_sse_broker.publish
             )
             
@@ -404,8 +416,10 @@ class BackendOrchestrator:
             enable_tmdb_tool = getattr(job, 'enable_tmdb_tool', self.config_manager.get('ENABLE_TMDB_TOOL', False))
             enable_openlibrary_tool = getattr(job, 'enable_openlibrary_tool', self.config_manager.get('ENABLE_OPENLIBRARY_TOOL', False))
             enable_comicvine_tool = getattr(job, 'enable_comicvine_tool', self.config_manager.get('ENABLE_COMICVINE_TOOL', False))
+            enable_library_tool = getattr(job, 'enable_library_tool', self.config_manager.get('ENABLE_LIBRARY_TOOL', False)) if hasattr(job, 'enable_library_tool') else self.config_manager.get('ENABLE_LIBRARY_TOOL', False)
+            enable_pending_tool = getattr(job, 'enable_pending_tool', self.config_manager.get('ENABLE_PENDING_TOOL', False)) if hasattr(job, 'enable_pending_tool') else self.config_manager.get('ENABLE_PENDING_TOOL', False)
             
-            logger.debug(f"Job {job.job_id} settings: custom_prompt={bool(custom_prompt)}, include_instructions={include_instructions}, include_filename={include_filename}, web_search={enable_web_search}, tmdb_tool={enable_tmdb_tool}, openlibrary_tool={enable_openlibrary_tool}, comicvine_tool={enable_comicvine_tool}")
+            logger.debug(f"Job {job.job_id} settings: custom_prompt={bool(custom_prompt)}, include_instructions={include_instructions}, include_filename={include_filename}, web_search={enable_web_search}, tmdb_tool={enable_tmdb_tool}, openlibrary_tool={enable_openlibrary_tool}, comicvine_tool={enable_comicvine_tool}, library_tool={enable_library_tool}, pending_tool={enable_pending_tool}")
             
             result = self.ai_processor.process_single(
                 job.relative_path,
@@ -416,6 +430,8 @@ class BackendOrchestrator:
                 enable_tmdb_tool=enable_tmdb_tool,
                 enable_openlibrary_tool=enable_openlibrary_tool,
                 enable_comicvine_tool=enable_comicvine_tool,
+                enable_library_tool=enable_library_tool,
+                enable_pending_tool=enable_pending_tool,
                 on_event=self.ai_sse_broker.publish
             )
             
@@ -497,20 +513,23 @@ class BackendOrchestrator:
             
             # Check if destination file already exists
             if os.path.exists(destination_file):
-                # Get relative path from library root to check if it's in "Other" folder
                 relative_dest_path = os.path.relpath(destination_file, library_path)
                 is_other_folder = relative_dest_path.startswith('Other' + os.sep) or relative_dest_path.startswith('Other/')
                 
-                if is_other_folder:
-                    # Allow overwriting in "Other" folder
+                if job.force_overwrite:
+                    logger.warning(f"Force overwrite enabled, removing existing file: {destination_file}")
+                    os.remove(destination_file)
+                elif is_other_folder:
                     logger.warning(f"Destination file exists in Other folder, will overwrite: {destination_file}")
-                    # Remove the existing file before moving
                     os.remove(destination_file)
                 else:
-                    # Fail the move for all other folders
-                    error_msg = f"Destination file already exists: {destination_file}"
-                    logger.error(error_msg)
-                    raise FileExistsError(error_msg)
+                    logger.warning(f"Destination file already exists: {destination_file}. Marking job as duplicate.")
+                    self.job_store.update_job(
+                        job.job_id,
+                        JobStatus.PENDING_COMPLETION,
+                        destination_exists=True
+                    )
+                    return
             
             shutil.move(file_path, destination_file)
             logger.info(f"Successfully moved file: {file_path} -> {destination_file}")
@@ -680,6 +699,32 @@ class BackendOrchestrator:
         logger.info(f"Job {job_id} marked as QUEUED_FOR_AI with priority=True")
         
         return True
+
+    def force_overwrite_job(self, job_id: str):
+        logger.info(f"Force overwrite requested for job {job_id}")
+        
+        job = self.job_store.get_job(job_id)
+        if not job:
+            logger.warning(f"Job {job_id} not found for force overwrite")
+            return False
+        
+        if job.status != JobStatus.PENDING_COMPLETION:
+            logger.warning(f"Job {job_id} is not PENDING_COMPLETION (status: {job.status.value})")
+            return False
+        
+        job.force_overwrite = True
+        logger.info(f"Force overwrite flag set for job {job_id}")
+        
+        completed_path = self.config_manager.get('COMPLETED_PATH')
+        file_path = os.path.join(completed_path, job.relative_path)
+        
+        if os.path.exists(file_path):
+            logger.info(f"Attempting overwrite move for {file_path}")
+            self._organize_file(job, file_path)
+            return True
+        else:
+            logger.warning(f"File not found in completed folder: {file_path}. Overwrite will apply when file arrives.")
+            return True
 
     def _check_and_remove_missing_files(self):
         """Check if files exist in downloading or completed folders, remove jobs for missing files after 5 seconds."""
