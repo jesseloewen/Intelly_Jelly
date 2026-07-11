@@ -37,7 +37,14 @@ You must return **only a single JSON array** as your response. Each object in th
 7.  **Filter Non-Media Files:** If a file is part of a download (e.g., in a Movie or TV Show folder) but is not the main media file, a subtitle, or a valid 'extra' as defined in the rules (e.g., it's an "extra picture" `.jpg`, `.png`, `.nfo`, or `.txt` file), it **must be categorized as `Other`**. These files should be placed in the `Other/` root directory, preserving their original filename.
 8.  **Strict Naming:** All media filenames and folders must strictly adhere to the naming conventions detailed below.
 9.  **Sub-Names & Subtitles:** When a title has a sub-name or subtitle (e.g., "Star Trek - Starfleet Academy", "CSI - Miami"), always use " - " (space-dash-space) to separate the main title from the sub-name. This applies to both Movies and TV Shows.
-10. **Valid Characters:** All suggested paths and filenames must be sanitized. Remove or replace any characters that are invalid in file systems (e.g., `?`, `*`, `<`, `>`, `|`, `"`). Colons (`:`) are a common invalid character in titles and **must** be replaced with a space or " - ". 
+10. **Edition/Release Tags:** When a filename or path contains a tag describing a specific **edition, version, or release** of the media (not file metadata like codec/resolution), you **must preserve** it in the filename using ` - ` (space-dash-space) after the year. These tags describe the media content itself, not the file:
+    * **Preserve these tags** (append to filename after `(Year)`):
+        * Movie editions: `Director's Cut`, `Extended Cut`, `Extended Edition`, `Theatrical Cut`, `Unrated`, `Unrated Cut`, `Alternate Ending`, `Remastered`, `Special Edition`, `Final Cut`, `Ultimate Edition`
+        * Book editions: `Illustrated Edition`, `Illustrated`, `Deluxe Edition`, `Special Edition`, `Collector's Edition`, `Updated Edition`, `Revised Edition`, `Annotated Edition`, `Annotated`, `Abridged`, `Unabridged`
+        * TV releases: `Extended Episode`, `Uncut`
+    * **Format:** `Movie Title (Year) - Director's Cut.ext`, `Book Title (Year) - Illustrated Edition.epub`, `TV Show (Year) - S01E01 - Pilot - Extended Episode.mkv`
+    * **Do NOT preserve** file metadata tags like `1080p`, `4K`, `HDR`, `x264`, `x265`, `HEVC`, `BluRay`, `WEB-DL`, `WEBRip`, `AAC`, `DTS`, `Atmos`, `HDRip`, `BRRip`, `HDTV`, etc. — strip these out.
+11. **Valid Characters:** All suggested paths and filenames must be sanitized. Remove or replace any characters that are invalid in file systems (e.g., `?`, `*`, `<`, `>`, `|`, `"`). Colons (`:`) are a common invalid character in titles and **must** be replaced with a space or " - ". 
 
 -----
 
@@ -79,6 +86,11 @@ You must return **only a single JSON array** as your response. Each object in th
   {
     "original_path": "Downloads/Best Movie (2019)/Part 1/file.mkv",
     "suggested_name": "Movies/Best Movie (2019)/Best Movie (2019) - Part 1.mkv",
+    "confidence": 100
+  },
+  {
+    "original_path": "Downloads/Movie.Title.2010.Directors.Cut.1080p.mkv",
+    "suggested_name": "Movies/Movie Title (2010)/Movie Title (2010) - Director's Cut.mkv",
     "confidence": 100
   }
 ]
@@ -225,6 +237,11 @@ You must return **only a single JSON array** as your response. Each object in th
   {
     "original_path": "torrents/The Hobbit - J.R.R. Tolkien (audiobook)/track 1.m4b",
     "suggested_name": "Books/Audiobooks/J. R. R. Tolkien/The Hobbit (1937)/01 - The Hobbit - Part 01.m4b",
+    "confidence": 90
+  },
+  {
+    "original_path": "downloads/Some Book (Illustrated Edition).epub",
+    "suggested_name": "Books/Books/Author Name/Some Book (2021) - Illustrated Edition/Some Book (2021) - Illustrated Edition.epub",
     "confidence": 90
   }
 ]
