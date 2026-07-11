@@ -183,10 +183,15 @@ You must return **only a single JSON array** as your response. Each object in th
 #### 📚 Books
 
   * **Root Folder:** `Books/`
-  * **Audiobooks:** `Books/Audiobooks/[Author]/[Book Title]/[book files]` (Author optional if unknown).
-  * **eBooks:** `Books/Books/[Author]/[Book Title]/[book files]` (Author required if known).
+  * **Audiobooks:** `Books/Audiobooks/[Author]/[Book Title (Year)]/[book files]` (Author optional if unknown).
+  * **eBooks:** `Books/Books/[Author]/[Book Title (Year)]/[book files]` (Author required if known).
   * **Comics:** `Books/Comics/[Series Name (Year)]/[comic files]` (Each issue file goes in the series folder).
-  * **File Naming:** Use the correct book title or comic issue name (e.g., `Book Title.epub`, `Series Name #001 (Year).cbz`).
+  * **Year:** For books and audiobooks, include the publication year in the book title folder and the main ebook file: `Book Title (Year)`. Use the year the book was first published. This provides consistency with Movies and TV Shows.
+  * **Author Name Formatting:** Author names must be properly formatted:
+      * All initials in author names must be **uppercase** and followed by a **space after each period** (e.g., `J. K. Rowling`, `J. R. R. Tolkien`, `C. S. Lewis`, `T. S. Eliot`).
+      * Never use run-together initials: `J.K. Rowling`, `J.R.R. Tolkien`, `C.S. Lewis` are incorrect.
+      * Never use lowercase initials: `j. k. rowling` is incorrect.
+  * **File Naming:** Use the correct book title or comic issue name (e.g., `Book Title (Year).epub`, `Series Name #001 (Year).cbz`).
   * **Audiobook Chapters:** For audiobooks with multiple chapter files, preserve the original chapter/track numbering with zero-padding:
       * Use format: `NN - Chapter Title.ext` (e.g., `01 - Prologue.m4b`, `02 - Chapter One.mp3`)
       * If chapters/tracks are unnamed, use: `NN - Book Title - Part NN.ext` (e.g., `01 - Dune - Part 01.mp3`)
@@ -199,7 +204,7 @@ You must return **only a single JSON array** as your response. Each object in th
 [
   {
     "original_path": "zips/auth_book4.epub",
-    "suggested_name": "Books/Books/Auth Name/Book4/Book4.epub",
+    "suggested_name": "Books/Books/Auth Name/Book4 (2020)/Book4 (2020).epub",
     "confidence": 90
   },
   {
@@ -209,17 +214,17 @@ You must return **only a single JSON array** as your response. Each object in th
   },
   {
     "original_path": "audio/Author/Book1/track 1.mp3",
-    "suggested_name": "Books/Audiobooks/Author/Book1/01 - Book1 - Part 01.mp3",
+    "suggested_name": "Books/Audiobooks/Author/Book1 (2023)/01 - Book1 - Part 01.mp3",
     "confidence": 95
   },
   {
     "original_path": "audiobooks/Dune/01 - Prologue.m4b",
-    "suggested_name": "Books/Audiobooks/Frank Herbert/Dune/01 - Prologue.m4b",
+    "suggested_name": "Books/Audiobooks/Frank Herbert/Dune (1965)/01 - Prologue.m4b",
     "confidence": 100
   },
   {
     "original_path": "torrents/The Hobbit - J.R.R. Tolkien (audiobook)/track 1.m4b",
-    "suggested_name": "Books/Audiobooks/J.R.R. Tolkien/The Hobbit/01 - The Hobbit - Part 01.m4b",
+    "suggested_name": "Books/Audiobooks/J. R. R. Tolkien/The Hobbit (1937)/01 - The Hobbit - Part 01.m4b",
     "confidence": 90
   }
 ]

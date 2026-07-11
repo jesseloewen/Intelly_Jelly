@@ -222,7 +222,7 @@ The AI follows strict rules defined in `instruction_prompt.md`:
 - **Movies**: `Movies/Movie Title (Year)/Movie Title (Year).ext`
 - **TV Shows**: `TV Shows/Show Name (Year)/Season XX/Show Name - SXXEXX - Episode Title.ext`
 - **Music**: `Music/Artist/Album/Track Number - Track Title.ext`
-- **Books**: `Books/Author/Book Title (Year).ext`
+- **Books**: `Books/Books/Author/Book Title (Year)/Book Title (Year).ext` (or `Books/Audiobooks/...` for audiobooks, `Books/Comics/...` for comics)
 - **Software**: Preserves original structure
 - **Other**: Everything else goes to `Other/`
 
