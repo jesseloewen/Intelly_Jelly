@@ -966,6 +966,24 @@
                             <small>Allow AI to query Open Library for accurate book/audiobook titles, authors, and publication metadata (all providers, no API key needed)</small>
                         </div>
                         
+                        <div class="form-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="comicvine-tool" name="ENABLE_COMICVINE_TOOL">
+                                <label for="comicvine-tool">Enable Comic Vine Tool</label>
+                            </div>
+                            <small>Allow AI to query Comic Vine for accurate comic book series, issues, and publication metadata (all providers)</small>
+                        </div>
+                        
+                        <div class="form-group" id="comicvine-api-key-group" style="display: none;">
+                            <label for="comicvine-api-key">Comic Vine API Key</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="text" id="comicvine-api-key" name="COMICVINE_API_KEY" placeholder="Enter Comic Vine API Key" style="flex: 1;">
+                                <button type="button" id="reveal-comicvine-key" class="reveal-key-btn" style="display: none;" onclick="toggleRevealKey('comicvine')">👁️</button>
+                                <button type="button" id="delete-comicvine-key" class="delete-key-btn" style="display: none;" onclick="deleteApiKey('comicvine')">Delete</button>
+                            </div>
+                            <small>Required for Comic Vine tool. Get your API key from <a href="https://comicvine.gamespot.com/api/" target="_blank">Comic Vine API</a></small>
+                        </div>
+                        
                         <div class="form-group" id="tmdb-api-key-group" style="display: none;">
                             <label for="tmdb-api-key">TMDB API Key</label>
                             <div style="display: flex; gap: 10px; align-items: center;">
@@ -1188,6 +1206,11 @@
                 document.getElementById('delete-tmdb-key').style.display = 'none';
                 document.getElementById('reveal-tmdb-key').style.display = 'none';
                 delete document.getElementById('tmdb-api-key').dataset.fullKey;
+            } else if (keyType === 'comicvine') {
+                document.getElementById('comicvine-api-key').value = '';
+                document.getElementById('delete-comicvine-key').style.display = 'none';
+                document.getElementById('reveal-comicvine-key').style.display = 'none';
+                delete document.getElementById('comicvine-api-key').dataset.fullKey;
             }
         }
         
@@ -1450,6 +1473,7 @@
                 const openrouterKey = currentConfig.OPENROUTER_API_KEY || '';
                 const jellyfinKey = currentConfig.JELLYFIN_API_KEY || '';
                 const tmdbKey = currentConfig.TMDB_API_KEY || '';
+                const comicvineKey = currentConfig.COMICVINE_API_KEY || '';
                 
                 if (googleKey) {
                     document.getElementById('google-api-key').value = maskApiKey(googleKey);
@@ -1496,6 +1520,15 @@
                     document.getElementById('delete-tmdb-key').style.display = 'inline-block';
                 }
                 
+                if (comicvineKey) {
+                    document.getElementById('comicvine-api-key').value = maskApiKey(comicvineKey);
+                    document.getElementById('comicvine-api-key').dataset.fullKey = comicvineKey;
+                    document.getElementById('reveal-comicvine-key').style.display = 'inline-block';
+                    document.getElementById('reveal-comicvine-key').textContent = '👁️';
+                    document.getElementById('reveal-comicvine-key').title = 'Show key';
+                    document.getElementById('delete-comicvine-key').style.display = 'inline-block';
+                }
+                
                 // Handle TMDB tool checkbox and show/hide API key field
                 const tmdbToolCheckbox = document.getElementById('tmdb-tool');
                 const tmdbApiKeyGroup = document.getElementById('tmdb-api-key-group');
@@ -1505,6 +1538,11 @@
                 // Handle Open Library tool checkbox
                 const openlibraryToolCheckbox = document.getElementById('openlibrary-tool');
                 openlibraryToolCheckbox.checked = currentConfig.ENABLE_OPENLIBRARY_TOOL || false;
+                
+                const comicvineToolCheckbox = document.getElementById('comicvine-tool');
+                const comicvineApiKeyGroup = document.getElementById('comicvine-api-key-group');
+                comicvineToolCheckbox.checked = currentConfig.ENABLE_COMICVINE_TOOL || false;
+                comicvineApiKeyGroup.style.display = comicvineToolCheckbox.checked ? 'block' : 'none';
                 
                 await loadModels();
                 restoreSectionStates();
@@ -1656,6 +1694,11 @@
             tmdbApiKeyGroup.style.display = this.checked ? 'block' : 'none';
         });
         
+        document.getElementById('comicvine-tool').addEventListener('change', function() {
+            const comicvineApiKeyGroup = document.getElementById('comicvine-api-key-group');
+            comicvineApiKeyGroup.style.display = this.checked ? 'block' : 'none';
+        });
+        
         // Function to manually refresh Ollama models
         async function refreshOllamaModels() {
             const provider = document.getElementById('ai-provider').value;
@@ -1762,9 +1805,10 @@
             config.JELLYFIN_REFRESH_ENABLED = document.getElementById('jellyfin-refresh').checked;
             config.ENABLE_TMDB_TOOL = document.getElementById('tmdb-tool').checked;
             config.ENABLE_OPENLIBRARY_TOOL = document.getElementById('openlibrary-tool').checked;
+            config.ENABLE_COMICVINE_TOOL = document.getElementById('comicvine-tool').checked;
             
             for (const [key, value] of formData.entries()) {
-                if (key === 'ENABLE_WEB_SEARCH' || key === 'JELLYFIN_REFRESH_ENABLED' || key === 'ENABLE_TMDB_TOOL' || key === 'ENABLE_OPENLIBRARY_TOOL') {
+                if (key === 'ENABLE_WEB_SEARCH' || key === 'JELLYFIN_REFRESH_ENABLED' || key === 'ENABLE_TMDB_TOOL' || key === 'ENABLE_OPENLIBRARY_TOOL' || key === 'ENABLE_COMICVINE_TOOL') {
                     // Skip - already handled above
                     continue;
                 } else if (key === 'AI_CALL_DELAY_SECONDS') {
@@ -1802,6 +1846,11 @@
                     const tmdbInput = document.getElementById('tmdb-api-key');
                     config[key] = tmdbInput.dataset.fullKey && value === maskApiKey(tmdbInput.dataset.fullKey) 
                         ? tmdbInput.dataset.fullKey 
+                        : value;
+                } else if (key === 'COMICVINE_API_KEY') {
+                    const comicvineInput = document.getElementById('comicvine-api-key');
+                    config[key] = comicvineInput.dataset.fullKey && value === maskApiKey(comicvineInput.dataset.fullKey) 
+                        ? comicvineInput.dataset.fullKey 
                         : value;
                 } else if (key === 'AI_MODEL') {
                     // Handle custom model

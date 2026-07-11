@@ -7,6 +7,7 @@ from typing import List, Dict, Optional, Callable
 from openai import OpenAI
 from backend.tmdb_api import TMDBClient, format_tool_response
 from backend.openlibrary_api import OpenLibraryClient, format_openlibrary_response
+from backend.comicvine_api import ComicVineClient, format_comicvine_response
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class AIProcessor:
         self.openrouter_client = None
         self.tmdb_client = None
         self.openlibrary_client = None
+        self.comicvine_client = None
         
         self.GOOGLE_MODELS = [
             "gemini-2.5-flash",
@@ -78,6 +80,23 @@ class AIProcessor:
             logger.info("Initialized Open Library client")
         
         return self.openlibrary_client
+    
+    def _get_comicvine_client(self) -> Optional[ComicVineClient]:
+        """Get or initialize Comic Vine client if enabled and configured."""
+        cv_enabled = self.config_manager.get('ENABLE_COMICVINE_TOOL', False)
+        if not cv_enabled:
+            return None
+        
+        api_key = self.config_manager.get('COMICVINE_API_KEY', '')
+        if not api_key:
+            logger.warning("Comic Vine tool is enabled but COMICVINE_API_KEY is not configured")
+            return None
+        
+        if not self.comicvine_client:
+            self.comicvine_client = ComicVineClient(api_key)
+            logger.info("Initialized Comic Vine client")
+        
+        return self.comicvine_client
     
     def _get_tmdb_tool_definition_google(self) -> Optional[Dict]:
         """Get TMDB tool definition for Google AI function calling."""
@@ -348,6 +367,86 @@ class AIProcessor:
             }
         ]
     
+    def _get_comicvine_tool_definition_google(self) -> Optional[Dict]:
+        """Get Comic Vine tool definitions for Google AI function calling."""
+        if not self._get_comicvine_client():
+            return None
+        
+        return {
+            "function_declarations": [
+                {
+                    "name": "search_comic_volume",
+                    "description": "Search for a comic book volume/series in Comic Vine to get accurate title, start year, publisher, and issue count. Use this when you need to verify comic series information or find start years.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "volume_name": {
+                                "type": "string",
+                                "description": "The name of the comic volume/series to search for"
+                            }
+                        },
+                        "required": ["volume_name"]
+                    }
+                },
+                {
+                    "name": "search_comic_issue",
+                    "description": "Search for a specific comic book issue in Comic Vine to get accurate issue number, cover date, and the volume it belongs to. Use this to identify specific issues from filenames that include issue numbers.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "issue_name": {
+                                "type": "string",
+                                "description": "The name of the comic issue to search for (can include volume name and issue number, e.g., 'Batman #1')"
+                            }
+                        },
+                        "required": ["issue_name"]
+                    }
+                }
+            ]
+        }
+    
+    def _get_comicvine_tools_for_openai(self) -> List[Dict]:
+        """Get Comic Vine tool definitions for OpenAI/OpenRouter function calling."""
+        if not self._get_comicvine_client():
+            return []
+        
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_comic_volume",
+                    "description": "Search for a comic book volume/series in Comic Vine to get accurate title, start year, publisher, and issue count. Use this when you need to verify comic series information or find start years.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "volume_name": {
+                                "type": "string",
+                                "description": "The name of the comic volume/series to search for"
+                            }
+                        },
+                        "required": ["volume_name"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_comic_issue",
+                    "description": "Search for a specific comic book issue in Comic Vine to get accurate issue number, cover date, and the volume it belongs to. Use this to identify specific issues from filenames that include issue numbers.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "issue_name": {
+                                "type": "string",
+                                "description": "The name of the comic issue to search for (can include volume name and issue number, e.g., 'Batman #1')"
+                            }
+                        },
+                        "required": ["issue_name"]
+                    }
+                }
+            }
+        ]
+    
     def _execute_tmdb_function(self, function_name: str, args: Dict) -> str:
         """Execute a TMDB or Open Library function call and return formatted response."""
         client = self._get_tmdb_client()
@@ -395,6 +494,19 @@ class AIProcessor:
                 elif function_name == "search_author":
                     result = ol_client.search_author(args.get("author_name", ""))
                     return format_openlibrary_response(result, "author")
+            
+            elif function_name in ("search_comic_volume", "search_comic_issue"):
+                cv_client = self._get_comicvine_client()
+                if not cv_client:
+                    return "Comic Vine tool is not available"
+                
+                if function_name == "search_comic_volume":
+                    result = cv_client.search_volume(args.get("volume_name", ""))
+                    return format_comicvine_response(result, "volume")
+                
+                elif function_name == "search_comic_issue":
+                    result = cv_client.search_issue(args.get("issue_name", ""))
+                    return format_comicvine_response(result, "issue")
             
             else:
                 return f"Unknown function: {function_name}"
@@ -470,19 +582,19 @@ class AIProcessor:
         
         return prompt
 
-    def process_single(self, file_path: str, custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, on_event: Optional[Callable] = None) -> Optional[Dict]:
+    def process_single(self, file_path: str, custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, on_event: Optional[Callable] = None) -> Optional[Dict]:
         """Process a single file using configured AI with optional web search and tools."""
         logger.info(f"Starting AI processing for file: {file_path}")
-        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}")
+        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}, ComicVine tool: {enable_comicvine_tool}")
         
-        results = self.process_batch([file_path], custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, on_event=on_event)
+        results = self.process_batch([file_path], custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, on_event=on_event)
         return results[0] if results else None
     
-    def process_batch(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def process_batch(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using configured AI provider with optional web search and tools."""
         logger.info(f"Starting AI processing for {len(file_paths)} file(s)")
         logger.debug(f"Files to process: {file_paths}")
-        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}")
+        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}, ComicVine tool: {enable_comicvine_tool}")
         
         # Override enable_tmdb_tool based on actual config state (if not explicitly disabled)
         if enable_tmdb_tool:
@@ -497,19 +609,25 @@ class AIProcessor:
                 logger.warning("Open Library tool requested but not enabled in config, disabling for this request")
                 enable_openlibrary_tool = False
         
+        if enable_comicvine_tool:
+            cv_enabled_in_config = self.config_manager.get('ENABLE_COMICVINE_TOOL', False)
+            if not cv_enabled_in_config:
+                logger.warning("Comic Vine tool requested but not enabled in config, disabling for this request")
+                enable_comicvine_tool = False
+        
         provider = self.config_manager.get('AI_PROVIDER', 'google')
         logger.info(f"Using AI provider: {provider}")
         
         if provider == 'openai':
-            return self._process_batch_openai(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, on_event=on_event)
-        elif provider == 'openrouter':
-            return self._process_batch_openrouter(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, on_event=on_event)
-        elif provider == 'ollama':
-            return self._process_batch_ollama(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, on_event=on_event)
-        else:
-            return self._process_batch_google(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, on_event=on_event)
+            return self._process_batch_openai(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, on_event=on_event)
+        elif provider == "openrouter":
+            return self._process_batch_openrouter(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, on_event=on_event)
+        elif provider == "ollama":
+            return self._process_batch_ollama(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, on_event=on_event)
+        elif provider == "google" or provider == "custom":
+            return self._process_batch_google(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, on_event=on_event)
     
-    def _process_batch_google(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def _process_batch_google(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using Google AI with optional web search and tools."""
         api_key = self.config_manager.get('GOOGLE_API_KEY', '')
         if not api_key:
@@ -556,11 +674,16 @@ class AIProcessor:
             if ol_tool:
                 tools.append(ol_tool)
         
+        if enable_comicvine_tool:
+            cv_tool = self._get_comicvine_tool_definition_google()
+            if cv_tool:
+                tools.append(cv_tool)
+        
         if tools:
             payload["tools"] = tools
         
         try:
-            # Enforce delay between API calls to avoid rate limiting
+            # Enforce delay between API calls
             delay_seconds = self.config_manager.get('AI_CALL_DELAY_SECONDS', 2)
             time_since_last_call = time.time() - self.last_api_call_time
             
@@ -732,7 +855,7 @@ class AIProcessor:
                 on_event({"type": "error", "message": str(e)})
             raise
 
-    def _process_batch_openai(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def _process_batch_openai(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using OpenAI with optional web search."""
         api_key = self.config_manager.get('OPENAI_API_KEY', '')
         if not api_key:
@@ -786,6 +909,12 @@ class AIProcessor:
                 if ol_tools:
                     tools.extend(ol_tools)
                 use_chat_api = True
+            
+            if enable_comicvine_tool:
+                cv_tools = self._get_comicvine_tools_for_openai()
+                if cv_tools:
+                    tools.extend(cv_tools)
+                    use_chat_api = True
             
             # Log full request
             logger.info("=" * 80)
@@ -959,7 +1088,7 @@ class AIProcessor:
                 on_event({"type": "error", "message": str(e)})
             raise
 
-    def _process_batch_openrouter(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def _process_batch_openrouter(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using OpenRouter (OpenAI-compatible API)."""
         api_key = self.config_manager.get('OPENROUTER_API_KEY', '')
         if not api_key:
@@ -1011,6 +1140,12 @@ class AIProcessor:
                 ol_tools = self._get_openlibrary_tools_for_openai()
                 if ol_tools:
                     tools.extend(ol_tools)
+                    use_tools = True
+            
+            if enable_comicvine_tool:
+                cv_tools = self._get_comicvine_tools_for_openai()
+                if cv_tools:
+                    tools.extend(cv_tools)
                     use_tools = True
             
             logger.info("=" * 80)
@@ -1232,7 +1367,7 @@ class AIProcessor:
             logger.error(f"Unexpected error fetching Ollama models: {e}")
             return ["Error: Failed to fetch models"]
     
-    def _process_batch_ollama(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def _process_batch_ollama(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using Ollama."""
         base_url = self.config_manager.get('OLLAMA_BASE_URL', 'http://localhost:11434')
         if not base_url:
@@ -1254,11 +1389,17 @@ class AIProcessor:
         
         if enable_openlibrary_tool:
             ol_tools = self._get_openlibrary_tools_for_openai()
-            if not enable_tmdb_tool:
+            if not enable_tmdb_tool and not enable_comicvine_tool:
                 tmdb_tools = []
             tmdb_tools.extend(ol_tools)
-        elif not enable_tmdb_tool:
+        elif not enable_tmdb_tool and not enable_comicvine_tool:
             tmdb_tools = []
+        
+        if enable_comicvine_tool:
+            cv_tools = self._get_comicvine_tools_for_openai()
+            if not enable_tmdb_tool and not enable_openlibrary_tool:
+                tmdb_tools = []
+            tmdb_tools.extend(cv_tools)
         
         try:
             # Enforce delay between API calls

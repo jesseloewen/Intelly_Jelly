@@ -350,10 +350,11 @@ def re_ai_job(job_id):
         enable_web_search = config_manager.get('ENABLE_WEB_SEARCH', False)
         enable_tmdb_tool = config_manager.get('ENABLE_TMDB_TOOL', False)
         enable_openlibrary_tool = config_manager.get('ENABLE_OPENLIBRARY_TOOL', False)
+        enable_comicvine_tool = config_manager.get('ENABLE_COMICVINE_TOOL', False)
         
-        logger.debug(f"Re-AI job data: custom_prompt={bool(custom_prompt)}, include_instructions={include_instructions}, include_filename={include_filename}, enable_web_search={enable_web_search}, enable_tmdb_tool={enable_tmdb_tool}, enable_openlibrary_tool={enable_openlibrary_tool}")
+        logger.debug(f"Re-AI job data: custom_prompt={bool(custom_prompt)}, include_instructions={include_instructions}, include_filename={include_filename}, enable_web_search={enable_web_search}, enable_tmdb_tool={enable_tmdb_tool}, enable_openlibrary_tool={enable_openlibrary_tool}, enable_comicvine_tool={enable_comicvine_tool}")
         
-        success = orchestrator.re_ai_job(job_id, custom_prompt, include_instructions, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool)
+        success = orchestrator.re_ai_job(job_id, custom_prompt, include_instructions, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool)
         
         if success:
             logger.info(f"Job {job_id} queued for re-processing")
@@ -416,6 +417,7 @@ def update_config():
         'ENABLE_WEB_SEARCH',
         'ENABLE_TMDB_TOOL',
         'ENABLE_OPENLIBRARY_TOOL',
+        'ENABLE_COMICVINE_TOOL',
         'AI_CALL_DELAY_SECONDS',
         'JELLYFIN_REFRESH_ENABLED',
         'APP_PASSWORD',
@@ -424,6 +426,7 @@ def update_config():
         'OPENAI_API_KEY',
         'OPENROUTER_API_KEY',
         'TMDB_API_KEY',
+        'COMICVINE_API_KEY',
         'OLLAMA_BASE_URL',
         'OLLAMA_TEMPERATURE',
         'OLLAMA_NUM_PREDICT',

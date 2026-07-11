@@ -59,6 +59,7 @@ class ConfigManager:
             "ENABLE_WEB_SEARCH": True,
             "ENABLE_TMDB_TOOL": False,
             "ENABLE_OPENLIBRARY_TOOL": False,
+            "ENABLE_COMICVINE_TOOL": False,
             "AI_CALL_DELAY_SECONDS": 2,
             "JELLYFIN_REFRESH_ENABLED": False,
             "APP_PASSWORD": "",
@@ -67,7 +68,8 @@ class ConfigManager:
             "OPENAI_API_KEY": "",
             "OPENROUTER_API_KEY": "",
             "JELLYFIN_API_KEY": "",
-            "TMDB_API_KEY": ""
+            "TMDB_API_KEY": "",
+            "COMICVINE_API_KEY": ""
         }
 
     def _start_watching(self):
