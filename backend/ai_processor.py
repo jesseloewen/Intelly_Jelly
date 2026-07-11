@@ -587,16 +587,16 @@ class AIProcessor:
             logger.info("=" * 80)
             logger.info(f"Model: {model}")
             logger.info(f"Web Search Enabled: {enable_web_search}")
-            logger.info(f"Prompt (first 500 chars): {prompt[:500]}...")
-            logger.info(f"Full Prompt:\n{prompt}")
-            logger.info(f"Generation Config: {json.dumps(payload['generationConfig'], indent=2)}")
+            logger.debug(f"Prompt (first 500 chars): {prompt[:500]}...")
+            logger.debug(f"Full Prompt:\n{prompt}")
+            logger.debug(f"Generation Config: {json.dumps(payload['generationConfig'], indent=2)}")
             if 'tools' in payload:
-                logger.info(f"Tools: {json.dumps(payload['tools'], indent=2)}")
+                logger.debug(f"Tools: {json.dumps(payload['tools'], indent=2)}")
             logger.info("=" * 80)
             
             # Handle multi-turn conversation for function calling
             conversation_history = payload["contents"].copy()
-            max_turns = 5  # Prevent infinite loops
+            max_turns = 10  # Prevent infinite loops
             
             for turn in range(max_turns):
                 req_start = time.time()
@@ -615,7 +615,7 @@ class AIProcessor:
                 logger.info(f"GOOGLE AI API RESPONSE (Turn {turn + 1})")
                 logger.info("=" * 80)
                 logger.info(f"Status Code: {response.status_code}")
-                logger.info(f"Full Response:\n{json.dumps(response.json(), indent=2)}")
+                logger.debug(f"Full Response:\n{json.dumps(response.json(), indent=2)}")
                 logger.info("=" * 80)
                 
                 data = response.json()
@@ -637,7 +637,7 @@ class AIProcessor:
                         func_name = fc['functionCall']['name']
                         func_args = fc['functionCall'].get('args', {})
                         
-                        logger.info(f"Executing function: {func_name} with args: {func_args}")
+                        logger.debug(f"Executing function: {func_name} with args: {func_args}")
                         if on_event:
                             on_event({"type": "tool_started", "tool": func_name, "args": json.dumps(func_args)})
                         result = self._execute_tmdb_function(func_name, func_args)
@@ -795,10 +795,10 @@ class AIProcessor:
             logger.info(f"Web Search Enabled: {enable_web_search}")
             logger.info(f"TMDB Tool Enabled: {enable_tmdb_tool}")
             logger.info(f"API: {'chat.completions' if use_chat_api else 'responses'}")
-            logger.info(f"Prompt (first 500 chars): {prompt[:500]}...")
-            logger.info(f"Full Prompt:\n{prompt}")
+            logger.debug(f"Prompt (first 500 chars): {prompt[:500]}...")
+            logger.debug(f"Full Prompt:\n{prompt}")
             if tools:
-                logger.info(f"Tools: {json.dumps(tools, indent=2)}")
+                logger.debug(f"Tools: {json.dumps(tools, indent=2)}")
             logger.info("=" * 80)
             
             # Get OpenAI parameters from config with defaults
@@ -813,7 +813,7 @@ class AIProcessor:
             if use_chat_api:
                 # Use chat.completions API for function calling support with multi-turn conversation
                 messages = [{"role": "user", "content": prompt}]
-                max_turns = 5
+                max_turns = 10
                 turn = 0
                 
                 while turn < max_turns:
@@ -850,7 +850,7 @@ class AIProcessor:
                             function_name = tool_call.function.name
                             function_args = json.loads(tool_call.function.arguments)
                             
-                            logger.info(f"Executing function: {function_name} with args: {function_args}")
+                            logger.debug(f"Executing function: {function_name} with args: {function_args}")
                             
                             if on_event:
                                 on_event({"type": "tool_started", "tool": function_name, "args": json.dumps(function_args)})
@@ -867,7 +867,7 @@ class AIProcessor:
                                 "content": json.dumps(function_result)
                             })
                             
-                            logger.info(f"Function {function_name} returned: {function_result}")
+                            logger.debug(f"Function {function_name} returned: {function_result}")
                         
                         # Continue to next turn to get AI's response with function results
                         continue
@@ -912,7 +912,7 @@ class AIProcessor:
             logger.info("OPENAI API RESPONSE")
             logger.info("=" * 80)
             logger.info(f"Response length: {len(text)} characters")
-            logger.info(f"Full Response:\n{text}")
+            logger.debug(f"Full Response:\n{text}")
             logger.info("=" * 80)
             
             logger.debug(f"Raw AI response length: {len(text)} characters")
@@ -1019,10 +1019,10 @@ class AIProcessor:
             logger.info(f"Model: {model}")
             logger.info(f"Web Search Enabled: {enable_web_search}")
             logger.info(f"TMDB Tool Enabled: {enable_tmdb_tool}")
-            logger.info(f"Prompt (first 500 chars): {prompt[:500]}...")
-            logger.info(f"Full Prompt:\n{prompt}")
+            logger.debug(f"Prompt (first 500 chars): {prompt[:500]}...")
+            logger.debug(f"Full Prompt:\n{prompt}")
             if tools:
-                logger.info(f"Tools: {json.dumps(tools, indent=2)}")
+                logger.debug(f"Tools: {json.dumps(tools, indent=2)}")
             logger.info("=" * 80)
             
             temperature = float(self.config_manager.get('OPENROUTER_TEMPERATURE', 0.1))
@@ -1032,7 +1032,7 @@ class AIProcessor:
             messages = [{"role": "user", "content": prompt}]
             
             if use_tools:
-                max_turns = 5
+                max_turns = 10
                 turn = 0
                 
                 while turn < max_turns:
@@ -1065,7 +1065,7 @@ class AIProcessor:
                             function_name = tool_call.function.name
                             function_args = json.loads(tool_call.function.arguments)
                             
-                            logger.info(f"Executing function: {function_name} with args: {function_args}")
+                            logger.debug(f"Executing function: {function_name} with args: {function_args}")
                             if on_event:
                                 on_event({"type": "tool_started", "tool": function_name, "args": json.dumps(function_args)})
                             function_result = self._execute_tmdb_function(function_name, function_args)
@@ -1078,7 +1078,7 @@ class AIProcessor:
                                 "content": json.dumps(function_result)
                             })
                             
-                            logger.info(f"Function {function_name} returned: {function_result}")
+                            logger.debug(f"Function {function_name} returned: {function_result}")
                         
                         continue
                     
@@ -1130,7 +1130,7 @@ class AIProcessor:
             logger.info("OPENROUTER API RESPONSE")
             logger.info("=" * 80)
             logger.info(f"Response length: {len(text)} characters")
-            logger.info(f"Full Response:\n{text}")
+            logger.debug(f"Full Response:\n{text}")
             logger.info("=" * 80)
             
             logger.debug(f"Raw AI response length: {len(text)} characters")
@@ -1285,10 +1285,10 @@ class AIProcessor:
             logger.info(f"Base URL: {base_url}")
             logger.info(f"Model: {model}")
             logger.info(f"TMDB Tool Enabled: {len(tmdb_tools) > 0}")
-            logger.info(f"Prompt (first 500 chars): {prompt[:500]}...")
-            logger.info(f"Full Prompt:\n{prompt}")
+            logger.debug(f"Prompt (first 500 chars): {prompt[:500]}...")
+            logger.debug(f"Full Prompt:\n{prompt}")
             if tmdb_tools:
-                logger.info(f"Tools: {json.dumps(tmdb_tools, indent=2)}")
+                logger.debug(f"Tools: {json.dumps(tmdb_tools, indent=2)}")
             logger.info("=" * 80)
             
             # Use Ollama's generate endpoint with configurable parameters
@@ -1363,7 +1363,7 @@ class AIProcessor:
             logger.info("OLLAMA API RESPONSE")
             logger.info("=" * 80)
             logger.info(f"Status Code: {response.status_code}")
-            logger.info(f"Full Response:\n{json.dumps(data, indent=2)}")
+            logger.debug(f"Full Response:\n{json.dumps(data, indent=2)}")
             if 'message' in data and 'thinking' in data.get('message', {}):
                 logger.info(f"Thinking detected (length: {len(data['message']['thinking'])} chars)")
             logger.info("=" * 80)
