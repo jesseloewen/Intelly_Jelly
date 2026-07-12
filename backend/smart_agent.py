@@ -333,6 +333,75 @@ class SmartAgent:
         }
         return json.dumps(summary, indent=2)
 
+    @staticmethod
+    def _repair_truncated_json(raw: str):
+        """Try to salvage a truncated JSON string by closing unclosed structures."""
+        raw = raw.strip()
+        if not raw:
+            return None
+        
+        last_conf = raw.rfind('"confidence":')
+        if last_conf > 0:
+            brace_pos = raw.rfind('{', last_conf)
+            if brace_pos > 0:
+                cleaned = raw[:brace_pos].rstrip().rstrip(',')
+                cleaned += '\n  ]\n}'
+                try:
+                    json.loads(cleaned)
+                    logger.info("Repaired truncated JSON by snipping incomplete entry")
+                    return cleaned
+                except json.JSONDecodeError:
+                    pass
+        
+        in_string = False
+        for i, ch in enumerate(raw):
+            if ch == '"' and (i == 0 or raw[i-1] != '\\\\'):
+                in_string = not in_string
+        if in_string:
+            cleaned = raw + '"'
+            open_braces = cleaned.count('{') - cleaned.count('}')
+            open_brackets = cleaned.count('[') - cleaned.count(']')
+            cleaned += '}' * max(0, open_braces)
+            cleaned += ']' * max(0, open_brackets)
+            try:
+                json.loads(cleaned)
+                logger.info("Repaired truncated JSON by closing unterminated string")
+                return cleaned
+            except json.JSONDecodeError:
+                pass
+        
+        cleaned = raw.rstrip().rstrip(',').rstrip('\n').rstrip('\r')
+        open_braces = cleaned.count('{') - cleaned.count('}')
+        open_brackets = cleaned.count('[') - cleaned.count(']')
+        cleaned += '}' * max(0, open_braces)
+        cleaned += ']' * max(0, open_brackets)
+        try:
+            json.loads(cleaned)
+            logger.info("Repaired truncated JSON by brute-force closing")
+            return cleaned
+        except json.JSONDecodeError:
+            pass
+        
+        return None
+
+    @staticmethod
+    def _safe_parse_json(raw: str, context_name: str):
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError as e:
+            logger.warning(f"Truncated JSON in {context_name}: {e} (raw length={len(raw)})")
+            repaired = SmartAgent._repair_truncated_json(raw)
+            if repaired:
+                try:
+                    result = json.loads(repaired)
+                    logger.info(f"Successfully repaired truncated JSON for {context_name} "
+                                f"(original={len(raw)} chars, repaired={len(repaired)})")
+                    return result
+                except json.JSONDecodeError:
+                    pass
+            logger.error(f"Unrecoverable JSON in {context_name}: {raw[:200]}...")
+            return None
+
     def _execute_tool(self, function_name: str, args: Dict) -> str:
         """Execute a tool call locally and return the result string."""
         try:
@@ -600,6 +669,10 @@ class SmartAgent:
         for fp in file_paths:
             prompt += f"- {fp}\n"
         prompt += f"\nTotal: {len(file_paths)} files.\n\n"
+        if len(file_paths) > 25:
+            prompt += (f"LARGE BATCH: {len(file_paths)} files. If the set_names JSON would be too long, "
+                       "split it into multiple set_names calls (e.g., ~20 files at a time). "
+                       "Call finish_group() after the final set_names.\n\n")
         prompt += ("WORKFLOW: 1. Call plan_lookups with ALL metadata you need (shows, books, movies, library/queue searches). "
                    "2. The system returns ALL results combined. 3. Call set_names with ALL files' names. "
                    "4. Call finish_group(). Do NOT use individual search tools — use plan_lookups for everything.")
@@ -691,7 +764,13 @@ class SmartAgent:
                 
                 for tool_call in message.tool_calls:
                     func_name = tool_call.function.name
-                    func_args = json.loads(tool_call.function.arguments)
+                    
+                    func_args = self._safe_parse_json(
+                        tool_call.function.arguments, func_name
+                    )
+                    if func_args is None:
+                        return {"status": "failed", "named": self._named_count,
+                                "note": f"Failed to parse {func_name} arguments — JSON too large, retry with fewer names per call"}
                     
                     if on_event:
                         on_event({"type": "tool_started", "tool": func_name,

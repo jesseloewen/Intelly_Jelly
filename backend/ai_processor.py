@@ -909,6 +909,64 @@ class AIProcessor:
                     continue
         
         return text
+
+    @staticmethod
+    def _repair_truncated_json(raw: str):
+        raw = raw.strip()
+        if not raw:
+            return None
+        last_conf = raw.rfind('"confidence":')
+        if last_conf > 0:
+            brace_pos = raw.rfind('{', last_conf)
+            if brace_pos > 0:
+                cleaned = raw[:brace_pos].rstrip().rstrip(',')
+                cleaned += '\n  ]\n}'
+                try:
+                    json.loads(cleaned)
+                    return cleaned
+                except json.JSONDecodeError:
+                    pass
+        in_string = False
+        for i, ch in enumerate(raw):
+            if ch == '"' and (i == 0 or raw[i-1] != '\\\\'):
+                in_string = not in_string
+        if in_string:
+            cleaned = raw + '"'
+            open_braces = cleaned.count('{') - cleaned.count('}')
+            open_brackets = cleaned.count('[') - cleaned.count(']')
+            cleaned += '}' * max(0, open_braces)
+            cleaned += ']' * max(0, open_brackets)
+            try:
+                json.loads(cleaned)
+                return cleaned
+            except json.JSONDecodeError:
+                pass
+        cleaned = raw.rstrip().rstrip(',').rstrip('\n').rstrip('\r')
+        open_braces = cleaned.count('{') - cleaned.count('}')
+        open_brackets = cleaned.count('[') - cleaned.count(']')
+        cleaned += '}' * max(0, open_braces)
+        cleaned += ']' * max(0, open_brackets)
+        try:
+            json.loads(cleaned)
+            return cleaned
+        except json.JSONDecodeError:
+            pass
+        return None
+
+    @staticmethod
+    def _safe_parse_json(raw: str, context_name: str):
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError as e:
+            logger.warning(f"Truncated JSON in {context_name}: {e} (raw length={len(raw)})")
+            repaired = AIProcessor._repair_truncated_json(raw)
+            if repaired:
+                try:
+                    return json.loads(repaired)
+                except json.JSONDecodeError:
+                    pass
+            logger.error(f"Unrecoverable JSON in {context_name}: {raw[:200]}...")
+            return None
     
     def _parse_ai_response(self, text: str, log_prefix: str, on_event: Optional[Callable] = None) -> List[Dict]:
         """Shared response parser for all AI providers.
@@ -1392,7 +1450,10 @@ class AIProcessor:
                         # Execute each tool call
                         for tool_call in message.tool_calls:
                             function_name = tool_call.function.name
-                            function_args = json.loads(tool_call.function.arguments)
+                            function_args = self._safe_parse_json(tool_call.function.arguments, function_name)
+                            if function_args is None:
+                                logger.error(f"Failed to parse {function_name} arguments")
+                                continue
                             
                             logger.debug(f"Executing function: {function_name} with args: {function_args}")
                             
@@ -1592,7 +1653,10 @@ class AIProcessor:
                         
                         for tool_call in message.tool_calls:
                             function_name = tool_call.function.name
-                            function_args = json.loads(tool_call.function.arguments)
+                            function_args = self._safe_parse_json(tool_call.function.arguments, function_name)
+                            if function_args is None:
+                                logger.error(f"Failed to parse {function_name} arguments")
+                                continue
                             
                             logger.debug(f"Executing function: {function_name} with args: {function_args}")
                             if on_event:
