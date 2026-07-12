@@ -1189,8 +1189,8 @@
                     valB = b.status.toLowerCase();
                     break;
                 case 'name':
-                    valA = (a.ai_determined_name || '').toLowerCase();
-                    valB = (b.ai_determined_name || '').toLowerCase();
+                    valA = (a.suggested_name || '').toLowerCase();
+                    valB = (b.suggested_name || '').toLowerCase();
                     break;
                 case 'confidence':
                     valA = a.confidence !== null ? a.confidence : -1;
@@ -1240,7 +1240,7 @@
                 if (!activeStatuses.includes(job.status)) return false;
                 if (searchTerm) {
                     const path = (job.relative_path || '').toLowerCase();
-                    const name = (job.ai_determined_name || '').toLowerCase();
+                    const name = (job.suggested_name || '').toLowerCase();
                     if (!path.includes(searchTerm) && !name.includes(searchTerm)) return false;
                 }
                 return true;
@@ -1303,11 +1303,11 @@
                         <td style="color: var(--text-secondary);">${idx + 1}</td>
                         <td>${job.relative_path}</td>
                         <td><span class="status-badge ${getStatusClass(job.status)}">${job.status}${retryInfo}</span></td>
-                        <td>${job.ai_determined_name || '-'}</td>
+                        <td>${job.suggested_name || '-'}</td>
                         <td>${job.confidence !== null ? job.confidence + '%' : '-'}</td>
                         <td>
                             <div class="actions">
-                                <button class="btn btn-edit" onclick="openEditModal('${job.job_id}', '${job.ai_determined_name || job.relative_path}')">Edit</button>
+                                <button class="btn btn-edit" onclick="openEditModal('${job.job_id}', '${job.suggested_name || job.relative_path}')">Edit</button>
                                 <button class="btn btn-reai" onclick="openReAIModal('${job.job_id}')">Re-AI</button>
                                 ${job.destination_exists && job.status === 'Pending Completion' ? `<button class="btn btn-overwrite" onclick="forceOverwriteJob('${job.job_id}')" title="Overwrite existing file in library">Overwrite</button>` : ''}
                             </div>

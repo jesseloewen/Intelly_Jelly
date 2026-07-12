@@ -466,7 +466,7 @@ class AIProcessor:
                             },
                             "category": {
                                 "type": "string",
-                                "description": "Optional. Narrow search to a specific folder: 'movies', 'tv', 'books', 'comics', 'audiobooks', 'music', 'software', 'other'. Omit to search everywhere."
+                                "description": "Optional. Narrow search to a specific folder. Category to folder mapping: 'movies'→Movies/, 'tv'→TV Shows/, 'music'→Music/, 'books'→Books/Books/, 'audiobooks'→Books/Audiobooks/, 'comics'→Books/Comics/, 'software'→Software/, 'other'→Other/. Omit to search everywhere."
                             }
                         },
                         "required": ["query"]
@@ -493,7 +493,7 @@ class AIProcessor:
                             },
                             "category": {
                                 "type": "string",
-                                "description": "Optional. Narrow search to a specific folder: 'movies', 'tv', 'books', 'comics', 'audiobooks', 'music', 'software', 'other'. Omit to search everywhere."
+                                "description": "Optional. Narrow search to a specific folder. Category to folder mapping: 'movies'→Movies/, 'tv'→TV Shows/, 'music'→Music/, 'books'→Books/Books/, 'audiobooks'→Books/Audiobooks/, 'comics'→Books/Comics/, 'software'→Software/, 'other'→Other/. Omit to search everywhere."
                             }
                         },
                         "required": ["query"]
@@ -670,6 +670,54 @@ class AIProcessor:
                     continue
         
         return text
+    
+    def _parse_ai_response(self, text: str, log_prefix: str, on_event: Optional[Callable] = None) -> List[Dict]:
+        """Shared response parser for all AI providers.
+        
+        Handles: code fence stripping, JSON extraction, parsing both
+        {'files': [...]} and direct list formats, event emission, and error handling.
+        
+        Args:
+            text: Raw response text from the AI provider.
+            log_prefix: Provider name for log messages (e.g., 'Google', 'OpenAI').
+            on_event: Optional SSE event callback.
+            
+        Returns:
+            List of result dicts with original_path, suggested_name, confidence.
+            Returns empty list on failure.
+        """
+        text = text.strip()
+        text = self._extract_json(text)
+        
+        logger.debug(f"[{log_prefix}] Parsing AI response as JSON")
+        
+        if not text:
+            logger.warning(f"[{log_prefix}] Empty response text after extraction")
+            return []
+        
+        try:
+            result = json.loads(text)
+        except json.JSONDecodeError as e:
+            logger.error(f"[{log_prefix}] Failed to parse JSON response: {e}")
+            logger.error(f"[{log_prefix}] Raw text (first 500 chars): {text[:500]}")
+            return []
+        
+        if isinstance(result, dict) and 'files' in result:
+            files = result['files']
+            logger.info(f"[{log_prefix}] AI processing completed: {len(files)} results from wrapped dict")
+            if on_event and files:
+                first = files[0]
+                on_event({"type": "result", "confidence": first.get('confidence', 0), "file_count": len(files)})
+            return files
+        elif isinstance(result, list):
+            logger.info(f"[{log_prefix}] AI processing completed: {len(result)} results from direct list")
+            if on_event and result:
+                first_confidence = result[0].get('confidence', 0) if isinstance(result[0], dict) else 0
+                on_event({"type": "result", "confidence": first_confidence, "file_count": len(result)})
+            return result
+        else:
+            logger.warning(f"[{log_prefix}] AI response in unexpected format, returning empty list")
+            return []
     
     def _get_instructions(self) -> str:
         # Check for custom instructions first, fall back to base instructions
@@ -944,38 +992,7 @@ class AIProcessor:
                 text = ''.join(text_parts)
                 logger.debug(f"Raw AI response length: {len(text)} characters")
                 
-                text = text.strip()
-                if text.startswith('```json'):
-                    text = text[7:]
-                if text.startswith('```'):
-                    text = text[3:]
-                if text.endswith('```'):
-                    text = text[:-3]
-                text = text.strip()
-                
-                logger.debug("Parsing AI response as JSON")
-                
-                if not text:
-                    logger.warning("Google AI returned empty response text")
-                    return []
-                
-                text = self._extract_json(text)
-                
-                result = json.loads(text)
-                
-                if isinstance(result, dict) and 'files' in result:
-                    logger.info(f"AI processing completed successfully: {len(result['files'])} results returned")
-                    files = result['files']
-                    if on_event and files:
-                        first = files[0]
-                        on_event({"type": "result", "confidence": first.get('confidence', 0), "file_count": len(files)})
-                    return files
-                elif isinstance(result, list):
-                    logger.info(f"AI processing completed successfully: {len(result)} results returned")
-                    return result
-                else:
-                    logger.warning("AI response did not contain expected format, returning empty list")
-                    return []
+                return self._parse_ai_response(text, "Google", on_event)
             
             # Max turns reached
             logger.warning(f"Maximum conversation turns ({max_turns}) reached without final answer")
@@ -986,12 +1003,6 @@ class AIProcessor:
             logger.error(f"Response content: {response.text if 'response' in locals() else 'N/A'}")
             if on_event:
                 on_event({"type": "error", "message": f"API error: {e}"})
-            raise
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse AI response as JSON: {e}")
-            logger.error(f"Raw response text: {text if 'text' in locals() else 'N/A'}")
-            if on_event:
-                on_event({"type": "error", "message": "Failed to parse AI response"})
             raise
         except KeyError as e:
             logger.error(f"Unexpected response structure from Google API: {e}")
@@ -1209,43 +1220,7 @@ class AIProcessor:
             logger.debug(f"Full Response:\n{text}")
             logger.info("=" * 80)
             
-            logger.debug(f"Raw AI response length: {len(text)} characters")
-            
-            # Parse response
-            text = text.strip()
-            if text.startswith('```json'):
-                text = text[7:]
-            if text.startswith('```'):
-                text = text[3:]
-            if text.endswith('```'):
-                text = text[:-3]
-            text = text.strip()
-            
-            logger.debug("Parsing AI response as JSON")
-            
-            if not text:
-                logger.warning("OpenAI returned empty response text")
-                return []
-            
-            text = self._extract_json(text)
-            
-            result = json.loads(text)
-            
-            if isinstance(result, dict) and 'files' in result:
-                logger.info(f"AI processing completed successfully: {len(result['files'])} results returned")
-                files = result['files']
-                if on_event and files:
-                    first = files[0]
-                    on_event({"type": "result", "confidence": first.get('confidence', 0), "file_count": len(files)})
-                return files
-            elif isinstance(result, list):
-                logger.info(f"AI processing completed successfully: {len(result)} results returned")
-                if on_event and result:
-                    on_event({"type": "result", "confidence": result[0].get('confidence', 0) if isinstance(result[0], dict) else 0, "file_count": len(result)})
-                return result
-            else:
-                logger.warning("AI response did not contain expected format, returning empty list")
-                return []
+            return self._parse_ai_response(text, "OpenAI", on_event)
                 
         except Exception as e:
             logger.error(f"OpenAI API error: {type(e).__name__}: {e}")
@@ -1448,48 +1423,7 @@ class AIProcessor:
             logger.debug(f"Full Response:\n{text}")
             logger.info("=" * 80)
             
-            logger.debug(f"Raw AI response length: {len(text)} characters")
-            
-            text = text.strip()
-            if text.startswith('```json'):
-                text = text[7:]
-            if text.startswith('```'):
-                text = text[3:]
-            if text.endswith('```'):
-                text = text[:-3]
-            text = text.strip()
-            
-            logger.debug("Parsing AI response as JSON")
-            
-            if not text:
-                logger.warning("OpenRouter returned empty response text — model may not be available or returned no content")
-                return []
-            
-            text = self._extract_json(text)
-            
-            try:
-                result = json.loads(text)
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse JSON response. Error: {e}")
-                logger.error(f"Text that failed to parse (first 500 chars): {text[:500]}")
-                logger.error(f"Text repr (first 200 chars): {repr(text[:200])}")
-                return []
-            
-            if isinstance(result, dict) and 'files' in result:
-                logger.info(f"AI processing completed successfully: {len(result['files'])} results returned")
-                files = result['files']
-                if on_event and files:
-                    first = files[0]
-                    on_event({"type": "result", "confidence": first.get('confidence', 0), "file_count": len(files)})
-                return files
-            elif isinstance(result, list):
-                logger.info(f"AI processing completed successfully: {len(result)} results returned")
-                if on_event and result:
-                    on_event({"type": "result", "confidence": result[0].get('confidence', 0) if isinstance(result[0], dict) else 0, "file_count": len(result)})
-                return result
-            else:
-                logger.warning("AI response did not contain expected format, returning empty list")
-                return []
+            return self._parse_ai_response(text, "OpenRouter", on_event)
                 
         except Exception as e:
             logger.error(f"OpenRouter API error: {type(e).__name__}: {e}")
@@ -1704,55 +1638,13 @@ class AIProcessor:
                 logger.info(f"Thinking detected (length: {len(data['message']['thinking'])} chars)")
             logger.info("=" * 80)
             
-            logger.debug(f"Raw AI response length: {len(text)} characters")
-            
-            # Parse response
-            text = text.strip()
-            if text.startswith('```json'):
-                text = text[7:]
-            if text.startswith('```'):
-                text = text[3:]
-            if text.endswith('```'):
-                text = text[:-3]
-            text = text.strip()
-            
-            logger.debug("Parsing AI response as JSON")
-            
-            if not text:
-                logger.warning("Ollama returned empty response text")
-                return []
-            
-            text = self._extract_json(text)
-            
-            result = json.loads(text)
-            
-            if isinstance(result, dict) and 'files' in result:
-                logger.info(f"AI processing completed successfully: {len(result['files'])} results returned")
-                files = result['files']
-                if on_event and files:
-                    first = files[0]
-                    on_event({"type": "result", "confidence": first.get('confidence', 0), "file_count": len(files)})
-                return files
-            elif isinstance(result, list):
-                logger.info(f"AI processing completed successfully: {len(result)} results returned")
-                if on_event and result:
-                    on_event({"type": "result", "confidence": result[0].get('confidence', 0) if isinstance(result[0], dict) else 0, "file_count": len(result)})
-                return result
-            else:
-                logger.warning("AI response did not contain expected format, returning empty list")
-                return []
+            return self._parse_ai_response(text, "Ollama", on_event)
                 
         except requests.exceptions.HTTPError as e:
             logger.error(f"Ollama API HTTP error: {e}, Status code: {response.status_code if 'response' in locals() else 'N/A'}")
             logger.error(f"Response content: {response.text if 'response' in locals() else 'N/A'}")
             if on_event:
                 on_event({"type": "error", "message": f"HTTP error: {e}"})
-            raise
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse AI response as JSON: {e}")
-            logger.error(f"Raw response text: {text if 'text' in locals() else 'N/A'}")
-            if on_event:
-                on_event({"type": "error", "message": "Failed to parse AI response"})
             raise
         except requests.exceptions.Timeout:
             logger.error("Ollama API request timed out")

@@ -369,7 +369,7 @@ class BackendOrchestrator:
                     self.job_store.update_job(
                         job.job_id,
                         JobStatus.PENDING_COMPLETION,
-                        ai_determined_name=suggested_name,
+                        suggested_name=suggested_name,
                         confidence=confidence,
                         priority=False if is_priority else job.priority
                     )
@@ -441,7 +441,7 @@ class BackendOrchestrator:
                 self.job_store.update_job(
                     job.job_id,
                     JobStatus.PENDING_COMPLETION,
-                    ai_determined_name=suggested_name,
+                    suggested_name=suggested_name,
                     confidence=confidence,
                     priority=False if is_priority else job.priority
                 )
@@ -491,7 +491,7 @@ class BackendOrchestrator:
         logger.info(f"Organizing file for job {job.job_id}: {file_path}")
         logger.debug(f"Library path: {library_path}")
         
-        new_name = job.ai_determined_name or os.path.basename(file_path)
+        new_name = job.suggested_name or os.path.basename(file_path)
         logger.debug(f"Target name: {new_name}")
         
         if job.new_path:
@@ -617,7 +617,7 @@ class BackendOrchestrator:
             logger.warning(f"File will not be organized. Job must have AI-generated name first.")
             return
         
-        if not matching_job.ai_determined_name:
+        if not matching_job.suggested_name:
             logger.warning(f"Job {matching_job.job_id} has no AI-generated name")
             logger.warning(f"File will not be organized. Run AI processing first.")
             return
@@ -626,7 +626,7 @@ class BackendOrchestrator:
         matching_job.original_path = file_path
         
         logger.info(f"Using AI-generated path from job {matching_job.job_id} to organize file")
-        logger.info(f"Target: {matching_job.ai_determined_name}")
+        logger.info(f"Target: {matching_job.suggested_name}")
         
         # Use the existing _organize_file method with AI-generated path
         self._organize_file(matching_job, file_path)
@@ -665,7 +665,7 @@ class BackendOrchestrator:
         self.job_store.update_job(
             job_id,
             JobStatus.MANUAL_EDIT,
-            ai_determined_name=new_name,
+            suggested_name=new_name,
             new_path=new_path
         )
         

@@ -27,7 +27,7 @@ class Job:
         self.original_path = original_path
         self.relative_path = relative_path
         self.status = JobStatus.QUEUED_FOR_AI
-        self.ai_determined_name: Optional[str] = None
+        self.suggested_name: Optional[str] = None
         self.new_path: Optional[str] = None
         self.confidence: Optional[int] = None
         self.error_message: Optional[str] = None
@@ -56,7 +56,7 @@ class Job:
             'original_path': self.original_path,
             'relative_path': self.relative_path,
             'status': self.status.value,
-            'ai_determined_name': self.ai_determined_name,
+            'suggested_name': self.suggested_name,
             'new_path': self.new_path,
             'confidence': self.confidence,
             'error_message': self.error_message,
@@ -160,7 +160,7 @@ class JobStore:
                 'original_path': job.original_path,
                 'relative_path': job.relative_path,
                 'status': job.status.value,
-                'ai_determined_name': job.ai_determined_name,
+                'suggested_name': job.suggested_name,
                 'new_path': job.new_path,
                 'confidence': job.confidence,
                 'created_at': job.created_at.isoformat(),
@@ -220,7 +220,7 @@ class JobStore:
                 job = Job(item['original_path'], item['relative_path'])
                 job.job_id = item.get('job_id', job.job_id)
                 job.status = JobStatus.PENDING_COMPLETION
-                job.ai_determined_name = item.get('ai_determined_name')
+                job.suggested_name = item.get('suggested_name') or item.get('ai_determined_name')
                 job.new_path = item.get('new_path')
                 job.confidence = item.get('confidence')
                 job.created_at = datetime.fromisoformat(item['created_at'])
@@ -249,11 +249,11 @@ class JobStore:
         """Search PENDING_COMPLETION jobs by query string. Designed for AI tool use.
         
         Args:
-            query: Substring to match against relative_path and ai_determined_name.
+            query: Substring to match against relative_path and suggested_name.
             max_results: Maximum results to return (default 15).
             
         Returns:
-            Compact list of {relative_path, ai_determined_name, confidence} dicts.
+            Compact list of {relative_path, suggested_name, confidence} dicts.
         """
         with self._lock:
             pending = [j for j in self._jobs.values() if j.status == JobStatus.PENDING_COMPLETION]
@@ -263,12 +263,12 @@ class JobStore:
         
         for job in pending:
             rel_path = (job.relative_path or '').lower()
-            ai_name = (job.ai_determined_name or '').lower()
+            ai_name = (job.suggested_name or '').lower()
             
             if query_lower in rel_path or query_lower in ai_name:
                 results.append({
                     'relative_path': job.relative_path,
-                    'ai_determined_name': job.ai_determined_name,
+                    'suggested_name': job.suggested_name,
                     'confidence': job.confidence,
                 })
             
