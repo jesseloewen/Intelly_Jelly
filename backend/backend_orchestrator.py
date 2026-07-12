@@ -3,12 +3,13 @@ import shutil
 import threading
 import time
 import logging
+import re
 import requests
 import uuid
 from typing import List, Optional
 from pathlib import Path
 
-from backend.job_store import JobStore, JobStatus
+from backend.job_store import JobStore, JobStatus, TV_EPISODE_PATTERN
 from backend.config_manager import ConfigManager
 from backend.ai_processor import AIProcessor
 from backend.library_browser import LibraryBrowser
@@ -19,6 +20,7 @@ from backend.file_watcher import (
 )
 from backend.file_movement_logger import FileMovementLogger
 from backend.ai_sse_broker import AISSEBroker
+from backend.smart_agent import SmartAgent
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +31,7 @@ class BackendOrchestrator:
         self.job_store = job_store
         self.library_browser = LibraryBrowser(config_manager.get('LIBRARY_PATH', './test_folders/library'))
         self.ai_processor = AIProcessor(config_manager, library_browser=self.library_browser, job_store=self.job_store)
+        self.smart_agent = SmartAgent(config_manager, job_store=self.job_store, library_browser=self.library_browser, ai_processor=self.ai_processor)
         self.file_movement_logger = FileMovementLogger()
         self.ai_sse_broker = AISSEBroker()
         
@@ -41,6 +44,7 @@ class BackendOrchestrator:
         self._running = False
         self._last_processing_time = time.time()  # Track last time we processed something
         self._stall_timeout = 30  # seconds before considering queue stalled
+        self._patience_timers = {}  # batch_id -> first_seen_time for patience window
         
         self.config_manager.register_change_callback(self._on_config_change)
 
@@ -226,17 +230,182 @@ class BackendOrchestrator:
                     return True
         
         return False
+
+    def _smart_pre_group(self, queued_jobs: List) -> List[List]:
+        """Intelligently group queued files into processing batches.
+        
+        Grouping strategies:
+        1. TV show episodes (same show + season via SxxExx pattern)
+        2. Multi-format (same base name, different extensions)
+        3. Book chapters (numbered files with same prefix)
+        4. Same directory + base name (existing grouping)
+        
+        Returns list of batches, each batch is a list of jobs.
+        """
+        
+        # Strategy 1: Group TV episodes by show+season
+        tv_groups = self._group_tv_episodes(queued_jobs)
+        
+        # Strategy 2: Group multi-format (same basename, diff extensions)
+        multi_format_groups = self._group_multi_format(queued_jobs)
+        
+        # Strategy 3: Group book chapters (numbered prefix pattern)
+        book_groups = self._group_book_chapters(queued_jobs)
+        
+        # Collect all groups
+        all_batches = tv_groups + multi_format_groups + book_groups
+        
+        # Assign batch IDs and track which jobs are grouped
+        grouped_job_ids = set()
+        for batch in all_batches:
+            for j in batch:
+                grouped_job_ids.add(j.job_id)
+        
+        # Remaining ungrouped jobs get their own batch (or combine with existing batch for same dir)
+        remaining = [j for j in queued_jobs if j.job_id not in grouped_job_ids]
+        
+        # Try to group remaining by directory + base name (existing grouping logic)
+        dir_groups = {}
+        for j in remaining:
+            file_dir = os.path.dirname(j.relative_path)
+            base_name = os.path.splitext(os.path.basename(j.relative_path))[0]
+            key = f"{file_dir}/{base_name}"
+            if key not in dir_groups:
+                dir_groups[key] = []
+            dir_groups[key].append(j)
+        
+        for group in dir_groups.values():
+            all_batches.append(group)
+        
+        # Assign batch IDs
+        for batch in all_batches:
+            batch_id = str(uuid.uuid4())
+            for job in batch:
+                job.batch_id = batch_id
+                job._batch_total = len(batch)
+        
+        return all_batches
+
+    def _group_tv_episodes(self, queued_jobs: List) -> List[List]:
+        """Group TV episode files by show name + season extracted from filename."""
+        tv_groups = {}
+        
+        for job in queued_jobs:
+            basename = os.path.splitext(os.path.basename(job.relative_path))[0]
+            match = re.search(TV_EPISODE_PATTERN, basename, re.IGNORECASE)
+            if not match:
+                continue
+            
+            season = int(match.group(1))
+            episode = int(match.group(2))
+            
+            before_ep = basename[:match.start()].strip().rstrip('.-_ ')
+            # Normalize show name: lowercase, remove special chars, collapse spaces
+            normalized_name = re.sub(r'[^a-z0-9]', '', before_ep.lower())
+            
+            key = f"{normalized_name}_s{season:02d}"
+            if key not in tv_groups:
+                tv_groups[key] = []
+            tv_groups[key].append((episode, job))
+        
+        batches = []
+        for key, entries in tv_groups.items():
+            if len(entries) >= 1:
+                entries.sort(key=lambda x: x[0])
+                batch = [j for _, j in entries]
+                batches.append(batch)
+        
+        return batches
+
+    def _group_multi_format(self, queued_jobs: List) -> List[List]:
+        """Group files with same base name but different extensions."""
+        from backend.job_store import MEDIA_EXTENSIONS, SUBTITLE_EXTENSIONS, BOOK_EXTENSIONS, AUDIOBOOK_EXTENSIONS
+        
+        base_name_map = {}
+        for job in queued_jobs:
+            file_dir = os.path.dirname(job.relative_path)
+            name, ext = os.path.splitext(os.path.basename(job.relative_path))
+            ext = ext.lower()
+            
+            # Strip subtitle language codes from base name for matching
+            # e.g., "movie.en" -> "movie", "movie.eng" -> "movie"
+            clean_name = re.sub(r'\.(en|eng|fr|de|es|it|ja|ko|zh|ar|pt|ru|hi|nl|sv|no|da|fi|pl|cs|tr|he|th|vi|ro|hu|el|bg|uk|id|ms|tl)(\.|$)', '', name + '.')
+            clean_name = clean_name.rstrip('.')
+            
+            key = f"{file_dir}/{clean_name}"
+            if key not in base_name_map:
+                base_name_map[key] = []
+            base_name_map[key].append(job)
+        
+        batches = []
+        for key, jobs in base_name_map.items():
+            if len(jobs) > 1:
+                batches.append(jobs)
+        
+        return batches
+
+    def _group_book_chapters(self, queued_jobs: List) -> List[List]:
+        """Group book chapter files by shared prefix and numeric ordering."""
+        chapter_groups = {}
+        
+        for job in queued_jobs:
+            basename = os.path.splitext(os.path.basename(job.relative_path))[0]
+            prefix = os.path.dirname(job.relative_path)
+            
+            # Look for leading numeric prefix: "01 - Title", "01_Title", "01 Title"
+            chapter_match = re.match(r'^(\d+)\s*[-._]?\s*(.*)', basename)
+            if chapter_match:
+                chapter_num = int(chapter_match.group(1))
+                key = f"{prefix}/numbered"
+                if key not in chapter_groups:
+                    chapter_groups[key] = []
+                chapter_groups[key].append((chapter_num, job))
+                continue
+            
+            # Look for "Chapter_N", "Chapter N", "Chapter-N", "Part N", "Track_N"
+            ch_match = re.match(r'^(chapter|part|track)\s*[-._]?\s*(\d+)', basename, re.IGNORECASE)
+            if ch_match:
+                ch_num = int(ch_match.group(2))
+                key = f"{prefix}/named_chapter"
+                if key not in chapter_groups:
+                    chapter_groups[key] = []
+                chapter_groups[key].append((ch_num, job))
+        
+        batches = []
+        for key, entries in chapter_groups.items():
+            if len(entries) >= 2:
+                entries.sort(key=lambda x: x[0])
+                batch = [j for _, j in entries]
+                batches.append(batch)
+        
+        return batches
+
+    def _should_process_batch(self, batch: List) -> bool:
+        """Check if a batch should be processed now or wait for more files (patience window)."""
+        patience_seconds = self.config_manager.get('BATCH_PATIENCE_SECONDS', 30)
+        
+        if patience_seconds <= 0 or len(batch) >= 10:
+            return True
+        
+        oldest_time = min((j.created_at.timestamp() for j in batch), default=0)
+        if oldest_time == 0:
+            return True
+        
+        age = time.time() - oldest_time
+        if age >= patience_seconds:
+            return True
+        
+        logger.debug(f"Batch has {len(batch)} files, waiting for more (oldest: {age:.1f}s ago, patience: {patience_seconds}s)")
+        return False
     
     def _queue_worker(self):
-        """Process jobs one at a time from the queue."""
-        logger.info("Queue worker started - processing one job at a time")
+        """Process jobs from the queue using smart agent batching when enabled."""
+        logger.info("Queue worker started")
         
         while self.queue_running:
             try:
-                # Check for missing files in downloading folder and remove stale jobs
                 self._check_and_remove_missing_files()
                 
-                # Check for stalled queue condition
                 if self._check_stalled_queue():
                     logger.info("Queue was stalled, resuming processing")
                 
@@ -247,53 +416,117 @@ class BackendOrchestrator:
                     job = priority_jobs[0]
                     logger.info(f"Processing priority job: {job.job_id} ({job.relative_path})")
                     self._process_single_job(job, is_priority=True)
-                    self._last_processing_time = time.time()  # Reset stall timer
+                    self._last_processing_time = time.time()
                 else:
-                    # Process regular queued jobs one at a time (or groups together)
-                    queued_jobs = self.job_store.get_jobs_by_status(JobStatus.QUEUED_FOR_AI)
-                    non_priority_jobs = [j for j in queued_jobs if not j.priority]
+                    use_smart_agent = self.config_manager.get('ENABLE_SMART_AGENT', True)
                     
-                    if non_priority_jobs:
-                        job = non_priority_jobs[0]
-                        
-                        # Check if this job is part of a group
-                        if job.group_id and job.is_group_primary:
-                            # Get all jobs in this group
-                            group_jobs = self.job_store.get_jobs_by_group(job.group_id)
-                            # Filter to only queued jobs
-                            group_queued = [j for j in group_jobs if j.status == JobStatus.QUEUED_FOR_AI]
-                            
-                            if len(group_queued) == len(group_jobs):
-                                # All files in group are ready, process together
-                                logger.info(f"Processing grouped jobs: {len(group_jobs)} files with same base name")
-                                self._process_grouped_jobs(group_jobs, is_priority=False)
-                                self._last_processing_time = time.time()  # Reset stall timer
-                            else:
-                                # Wait for all files in group to be queued
-                                logger.debug(f"Waiting for all files in group {job.group_id} to be ready ({len(group_queued)}/{len(group_jobs)})")
-                        elif job.is_group_primary or not job.group_id:
-                            # Single file or primary file without group
-                            logger.info(f"Processing queued job: {job.job_id} ({job.relative_path})")
-                            self._process_single_job(job, is_priority=False)
-                            self._last_processing_time = time.time()  # Reset stall timer
-                        else:
-                            # Secondary file in group, skip (will be processed with primary)
-                            logger.debug(f"Skipping secondary file {job.job_id}, waiting for primary file in group")
+                    if use_smart_agent:
+                        self._process_queue_with_agent()
                     else:
-                        # If no queued jobs, check for failed jobs to retry
-                        # Only retry after all other jobs are complete
-                        failed_jobs = self.job_store.get_failed_jobs_for_retry()
-                        if failed_jobs:
-                            job = failed_jobs[0]
-                            logger.info(f"Retrying failed job: {job.job_id} ({job.relative_path}) - Attempt {job.retry_count + 1}/{job.max_retries}")
-                            self._process_single_job(job, is_priority=False, is_retry=True)
-                            self._last_processing_time = time.time()  # Reset stall timer
+                        self._process_queue_legacy()
                 
                 time.sleep(1)
             
             except Exception as e:
                 logger.error(f"Error in queue worker: {type(e).__name__}: {e}", exc_info=True)
                 time.sleep(1)
+
+    def _process_queue_with_agent(self):
+        """Process queued jobs using the Smart Agent with intelligent pre-grouping."""
+        queued_jobs = self.job_store.get_jobs_by_status(JobStatus.QUEUED_FOR_AI)
+        non_priority = [j for j in queued_jobs if not j.priority]
+        
+        if not non_priority:
+            self._retry_failed_jobs()
+            return
+        
+        # Smart pre-grouping
+        batches = self._smart_pre_group(non_priority)
+        
+        if not batches:
+            return
+        
+        # Process the first ready batch
+        # For independent groups, process immediately
+        # For groups waiting on patience, skip for now
+        batch_found = False
+        for batch in batches:
+            if not batch:
+                continue
+            if self._should_process_batch(batch):
+                logger.info(f"Smart Agent processing batch: {len(batch)} files")
+                self.ai_sse_broker.publish({"type": "agent_batch_found",
+                    "batch_size": len(batch),
+                    "files": [j.relative_path for j in batch[:5]]})
+                
+                self._process_agent_batch(batch)
+                self._last_processing_time = time.time()
+                batch_found = True
+                break
+        
+        # If no batch is ready (all waiting for patience), process the oldest one anyway
+        if not batch_found:
+            # Force process the first batch regardless of patience
+            for batch in batches:
+                if batch:
+                    self._process_agent_batch(batch)
+                    self._last_processing_time = time.time()
+                    break
+            else:
+                # If somehow no batch, process individual jobs
+                if non_priority:
+                    job = non_priority[0]
+                    self._process_single_job(job)
+
+    def _process_agent_batch(self, batch: List):
+        """Process a batch of jobs through the Smart Agent."""
+        file_paths = [j.relative_path for j in batch]
+        
+        result = self.smart_agent.process_batch(
+            file_paths,
+            custom_prompt=getattr(batch[0], 'custom_prompt', None) if batch else None,
+            on_event=self.ai_sse_broker.publish
+        )
+        
+        logger.info(f"Smart Agent batch result: {result.get('status')} - {result.get('named')} named, {result.get('failed', 0)} failed")
+        
+        return result
+
+    def _process_queue_legacy(self):
+        """Original single-job-at-a-time processing for backward compatibility."""
+        queued_jobs = self.job_store.get_jobs_by_status(JobStatus.QUEUED_FOR_AI)
+        non_priority_jobs = [j for j in queued_jobs if not j.priority]
+        
+        if non_priority_jobs:
+            job = non_priority_jobs[0]
+            
+            if job.group_id and job.is_group_primary:
+                group_jobs = self.job_store.get_jobs_by_group(job.group_id)
+                group_queued = [j for j in group_jobs if j.status == JobStatus.QUEUED_FOR_AI]
+                
+                if len(group_queued) == len(group_jobs):
+                    logger.info(f"Processing grouped jobs: {len(group_jobs)} files with same base name")
+                    self._process_grouped_jobs(group_jobs, is_priority=False)
+                    self._last_processing_time = time.time()
+                else:
+                    logger.debug(f"Waiting for all files in group {job.group_id} to be ready ({len(group_queued)}/{len(group_jobs)})")
+            elif job.is_group_primary or not job.group_id:
+                logger.info(f"Processing queued job: {job.job_id} ({job.relative_path})")
+                self._process_single_job(job, is_priority=False)
+                self._last_processing_time = time.time()
+            else:
+                logger.debug(f"Skipping secondary file {job.job_id}, waiting for primary file in group")
+        else:
+            self._retry_failed_jobs()
+
+    def _retry_failed_jobs(self):
+        """Retry failed jobs after all queued jobs are processed."""
+        failed_jobs = self.job_store.get_failed_jobs_for_retry()
+        if failed_jobs:
+            job = failed_jobs[0]
+            logger.info(f"Retrying failed job: {job.job_id} ({job.relative_path}) - Attempt {job.retry_count + 1}/{job.max_retries}")
+            self._process_single_job(job, is_priority=False, is_retry=True)
+            self._last_processing_time = time.time()
     
     def _process_grouped_jobs(self, jobs: List, is_priority: bool = False):
         """Process a group of jobs with the same base name together through AI."""
@@ -734,7 +967,7 @@ class BackendOrchestrator:
         # Get all jobs that are not yet completed
         active_jobs = [
             job for job in self.job_store.get_all_jobs()
-            if job.status not in [JobStatus.COMPLETED, JobStatus.FAILED]
+            if job.status not in [JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.AGENT_NAMED]
         ]
         
         for job in active_jobs:

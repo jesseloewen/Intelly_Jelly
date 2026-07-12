@@ -32,6 +32,8 @@
     --status-failed-text: #d63031;
     --status-manual-bg: #fdcb6e;
     --status-manual-text: #e17055;
+    --status-agent-bg: #c084fc;
+    --status-agent-text: #7c3aed;
     --error-bg: #4a1f1f;
     --error-text: #ff7675;
     --error-border: #d63031;
@@ -73,6 +75,8 @@
     --status-failed-text: #c62828;
     --status-manual-bg: #ffe0b2;
     --status-manual-text: #e65100;
+    --status-agent-bg: #d8b4fe;
+    --status-agent-text: #6d28d9;
     --error-bg: #ffebee;
     --error-text: #c62828;
     --error-border: #ef5350;

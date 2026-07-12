@@ -1014,6 +1014,28 @@
                         </div>
                         
                         <div class="form-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="search-queue-tool" name="ENABLE_SEARCH_QUEUE_TOOL" checked>
+                                <label for="search-queue-tool">Enable Queue Search Tool</label>
+                            </div>
+                            <small>Allow AI to search ALL queued jobs (not just pending). Essential for smart agent batching — finds related files like other episodes, subtitles, or multi-format versions. Default: ON.</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="smart-agent" name="ENABLE_SMART_AGENT" checked>
+                                <label for="smart-agent">Enable Smart Agent Batching</label>
+                            </div>
+                            <small>Process files in intelligent batches instead of one-by-one. TV episodes are grouped by season, book chapters are processed together, multi-format files are handled in one go. Significantly reduces AI API calls. Default: ON.</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="batch-patience">Batch Patience (seconds)</label>
+                            <input type="number" id="batch-patience" name="BATCH_PATIENCE_SECONDS" min="0" max="300" step="5" placeholder="30">
+                            <small>How long to wait for more related files to arrive before processing a batch. Set to 0 to process immediately (default: 30 seconds).</small>
+                        </div>
+                        
+                        <div class="form-group">
                             <label for="ai-delay">API Call Delay (seconds)</label>
                             <input type="number" id="ai-delay" name="AI_CALL_DELAY_SECONDS" min="0" max="10" step="0.5" placeholder="2">
                             <small>Delay between API calls to avoid rate limiting (default: 2 seconds)</small>
@@ -1569,6 +1591,14 @@
                 const pendingToolCheckbox = document.getElementById('pending-tool');
                 pendingToolCheckbox.checked = currentConfig.ENABLE_PENDING_TOOL || false;
                 
+                const searchQueueToolCheckbox = document.getElementById('search-queue-tool');
+                searchQueueToolCheckbox.checked = currentConfig.ENABLE_SEARCH_QUEUE_TOOL !== false;
+                
+                const smartAgentCheckbox = document.getElementById('smart-agent');
+                smartAgentCheckbox.checked = currentConfig.ENABLE_SMART_AGENT !== false;
+                
+                document.getElementById('batch-patience').value = currentConfig.BATCH_PATIENCE_SECONDS || 30;
+                
                 await loadModels();
                 restoreSectionStates();
             } catch (error) {
@@ -1833,9 +1863,12 @@
             config.ENABLE_COMICVINE_TOOL = document.getElementById('comicvine-tool').checked;
             config.ENABLE_LIBRARY_TOOL = document.getElementById('library-tool').checked;
             config.ENABLE_PENDING_TOOL = document.getElementById('pending-tool').checked;
+            config.ENABLE_SEARCH_QUEUE_TOOL = document.getElementById('search-queue-tool').checked;
+            config.ENABLE_SMART_AGENT = document.getElementById('smart-agent').checked;
+            config.BATCH_PATIENCE_SECONDS = parseInt(document.getElementById('batch-patience').value) || 30;
             
             for (const [key, value] of formData.entries()) {
-                if (key === 'ENABLE_WEB_SEARCH' || key === 'JELLYFIN_REFRESH_ENABLED' || key === 'ENABLE_TMDB_TOOL' || key === 'ENABLE_OPENLIBRARY_TOOL' || key === 'ENABLE_COMICVINE_TOOL' || key === 'ENABLE_LIBRARY_TOOL' || key === 'ENABLE_PENDING_TOOL') {
+                if (key === 'ENABLE_WEB_SEARCH' || key === 'JELLYFIN_REFRESH_ENABLED' || key === 'ENABLE_TMDB_TOOL' || key === 'ENABLE_OPENLIBRARY_TOOL' || key === 'ENABLE_COMICVINE_TOOL' || key === 'ENABLE_LIBRARY_TOOL' || key === 'ENABLE_PENDING_TOOL' || key === 'ENABLE_SEARCH_QUEUE_TOOL' || key === 'ENABLE_SMART_AGENT') {
                     // Skip - already handled above
                     continue;
                 } else if (key === 'AI_CALL_DELAY_SECONDS') {

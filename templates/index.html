@@ -156,6 +156,7 @@
         .status-completed { background: var(--status-completed-bg); color: var(--status-completed-text); }
         .status-failed { background: var(--status-failed-bg); color: var(--status-failed-text); }
         .status-manual { background: var(--status-manual-bg); color: var(--status-manual-text); }
+        .status-agent { background: var(--status-agent-bg); color: var(--status-agent-text); }
         
         .error-message {
             padding: 12px;
@@ -648,6 +649,11 @@
             color: var(--status-failed-text);
         }
         
+        .filter-chip.chip-agent {
+            background: var(--status-agent-bg);
+            color: var(--status-agent-text);
+        }
+        
         .filter-divider {
             width: 1px;
             height: 24px;
@@ -852,6 +858,71 @@
             color: #fdcb6e;
         }
         
+        .ai-event.type-agent_batch_started .event-msg {
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+        
+        .ai-event.type-agent_batch_done .event-msg {
+            color: #00b894;
+            font-weight: 700;
+        }
+        
+        .ai-event.type-agent_batch_error .event-msg {
+            color: #d63031;
+            font-weight: 600;
+        }
+        
+        .batch-progress-bar {
+            padding: 16px 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .batch-progress-bar.active {
+            display: block;
+        }
+        
+        .batch-progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .batch-progress-title {
+            font-weight: 600;
+            font-size: 15px;
+        }
+        
+        .batch-progress-count {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+        
+        .batch-progress-track {
+            height: 8px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .batch-progress-fill {
+            height: 100%;
+            background: var(--primary-color);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        .batch-file-list {
+            margin-top: 10px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            max-height: 80px;
+            overflow-y: auto;
+        }
+        
         .ai-monitor-empty {
             color: var(--text-secondary);
             font-style: italic;
@@ -933,6 +1004,7 @@
             <div class="status-chips" id="status-chips">
                 <span class="filter-chip chip-queued" data-status="Queued for AI" onclick="toggleStatusChip(this)">Queued</span>
                 <span class="filter-chip chip-processing" data-status="Processing AI" onclick="toggleStatusChip(this)">Processing</span>
+                <span class="filter-chip chip-agent" data-status="Agent Named" onclick="toggleStatusChip(this)">Agent Named</span>
                 <span class="filter-chip chip-pending" data-status="Pending Completion" onclick="toggleStatusChip(this)">Pending</span>
                 <span class="filter-chip chip-failed" data-status="Failed" onclick="toggleStatusChip(this)">Failed</span>
             </div>
@@ -942,6 +1014,17 @@
                 <button class="clear-search" id="clear-search" onclick="clearSearch()" title="Clear search">&times;</button>
             </div>
             <span class="filter-count" id="filter-count"></span>
+        </div>
+        
+        <div class="batch-progress-bar" id="batch-progress">
+            <div class="batch-progress-header">
+                <span class="batch-progress-title" id="batch-title">Processing batch...</span>
+                <span class="batch-progress-count" id="batch-count">0/0</span>
+            </div>
+            <div class="batch-progress-track">
+                <div class="batch-progress-fill" id="batch-fill" style="width: 0%"></div>
+            </div>
+            <div class="batch-file-list" id="batch-files"></div>
         </div>
         
         <div class="ai-monitor" id="ai-monitor">
@@ -1066,6 +1149,7 @@
             const statusMap = {
                 'Queued for AI': 'status-queued',
                 'Processing AI': 'status-processing',
+                'Agent Named': 'status-agent',
                 'Pending Completion': 'status-pending',
                 'Completed': 'status-completed',
                 'Failed': 'status-failed',
@@ -1078,7 +1162,7 @@
             const p = new URLSearchParams(window.location.search);
             return {
                 search: p.get('search') || '',
-                statuses: p.get('status') ? p.get('status').split(',') : ['Queued for AI', 'Processing AI', 'Pending Completion', 'Failed'],
+                statuses: p.get('status') ? p.get('status').split(',') : ['Queued for AI', 'Processing AI', 'Agent Named', 'Pending Completion', 'Failed'],
                 sort: p.get('sort') || 'created_at',
                 order: p.get('order') || 'asc'
             };
@@ -1090,7 +1174,7 @@
             if (searchVal) p.set('search', searchVal);
             
             const activeStatuses = getActiveStatuses();
-            const defaultStatuses = ['Queued for AI', 'Processing AI', 'Pending Completion', 'Failed'];
+            const defaultStatuses = ['Queued for AI', 'Processing AI', 'Agent Named', 'Pending Completion', 'Failed'];
             if (JSON.stringify(activeStatuses.sort()) !== JSON.stringify(defaultStatuses.sort())) {
                 p.set('status', activeStatuses.join(','));
             }
@@ -1458,6 +1542,40 @@
             statusText.textContent = text;
         }
         
+        function updateBatchProgress(named, total, title, files, done) {
+            const bar = document.getElementById('batch-progress');
+            const fill = document.getElementById('batch-fill');
+            const count = document.getElementById('batch-count');
+            const titleEl = document.getElementById('batch-title');
+            const fileList = document.getElementById('batch-files');
+            
+            if (!total) {
+                bar.classList.remove('active');
+                return;
+            }
+            
+            bar.classList.add('active');
+            const pct = total > 0 ? Math.round((named / total) * 100) : 0;
+            fill.style.width = pct + '%';
+            count.textContent = named + '/' + total;
+            titleEl.textContent = title;
+            
+            if (files && files.length) {
+                fileList.innerHTML = files.slice(0, 8).map(f => '• ' + f).join('<br>');
+                if (files.length > 8) fileList.innerHTML += '<br>... and ' + (files.length - 8) + ' more';
+            }
+            
+            if (done) {
+                fill.style.background = named > 0 ? '#00b894' : '#d63031';
+                setTimeout(() => {
+                    bar.classList.remove('active');
+                    fill.style.background = '';
+                }, 5000);
+            } else {
+                fill.style.background = '';
+            }
+        }
+        
         function formatTime(ts) {
             const d = new Date(ts);
             return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1493,6 +1611,13 @@
                     case 'thinking':
                         icon = '💭';
                         msg = ev.message;
+                        // Update batch progress from agent thinking messages
+                        if (ev.message && ev.message.includes('/')) {
+                            const match = ev.message.match(/Named\s+(\d+)\/(\d+)/);
+                            if (match) {
+                                updateBatchProgress(parseInt(match[1]), parseInt(match[2]), 'Agent naming files...');
+                            }
+                        }
                         break;
                     case 'api_request':
                         icon = '📡';
@@ -1528,6 +1653,27 @@
                     case 'job_error':
                         icon = '✖';
                         msg = `Error: ${ev.error}`;
+                        break;
+                    case 'agent_batch_started':
+                        icon = '📦';
+                        msg = `Agent batch started: ${ev.total} files`;
+                        if (ev.files && ev.files.length) msg += ` (${ev.files.slice(0, 3).join(', ')}${ev.files.length > 3 ? '...' : ''})`;
+                        updateBatchProgress(0, ev.total, 'Processing batch...', ev.files || []);
+                        break;
+                    case 'agent_batch_done':
+                        icon = '✅';
+                        msg = `Batch complete: ${ev.named} named`;
+                        if (ev.failed) msg += `, ${ev.failed} failed`;
+                        updateBatchProgress(ev.named, ev.named + (ev.failed || 0), 'Batch complete', [], true);
+                        break;
+                    case 'agent_batch_error':
+                        icon = '💥';
+                        msg = `Batch error: ${ev.error}`;
+                        updateBatchProgress(0, 0, 'Batch failed', [], true);
+                        break;
+                    case 'agent_batch_found':
+                        icon = '📋';
+                        msg = `Found batch: ${ev.batch_size} files`;
                         break;
                     default:
                         icon = '·';

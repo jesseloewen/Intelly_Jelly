@@ -15,10 +15,21 @@ PENDING_JOBS_FILE = 'pending_jobs.json'
 class JobStatus(Enum):
     QUEUED_FOR_AI = "Queued for AI"
     PROCESSING_AI = "Processing AI"
+    AGENT_NAMED = "Agent Named"
     PENDING_COMPLETION = "Pending Completion"
     COMPLETED = "Completed"
     FAILED = "Failed"
     MANUAL_EDIT = "Manual Edit"
+
+
+BATCH_PROCESSABLE_STATUSES = {JobStatus.QUEUED_FOR_AI, JobStatus.AGENT_NAMED, JobStatus.PENDING_COMPLETION}
+
+TV_EPISODE_PATTERN = r'[Ss](\d{1,4})[Ee](\d{1,4})'
+MEDIA_EXTENSIONS = {'.mkv', '.mp4', '.avi', '.mov', '.wmv', '.m4v'}
+SUBTITLE_EXTENSIONS = {'.srt', '.sub', '.ass', '.ssa', '.vtt', '.idx'}
+BOOK_EXTENSIONS = {'.epub', '.mobi', '.pdf', '.azw3', '.azw'}
+AUDIOBOOK_EXTENSIONS = {'.m4b', '.m4a'}
+COMIC_EXTENSIONS = {'.cbz', '.cbr', '.cbt'}
 
 
 class Job:
@@ -49,6 +60,10 @@ class Job:
         self.is_group_primary: bool = False  # First file in a group is primary
         self.destination_exists: bool = False  # True when library destination already taken
         self.force_overwrite: bool = False  # User explicitly chose to overwrite duplicate
+        self.batch_id: Optional[str] = None  # Smart agent batch grouping
+        self._batch_position: int = 0  # Position in batch (1-indexed for UI)
+        self._batch_total: int = 0  # Total files in batch
+        self._batch_message: str = ""  # Current agent status message for UI
 
     def to_dict(self) -> dict:
         return {
@@ -66,7 +81,11 @@ class Job:
             'retry_count': self.retry_count,
             'max_retries': self.max_retries,
             'destination_exists': self.destination_exists,
-            'force_overwrite': self.force_overwrite
+            'force_overwrite': self.force_overwrite,
+            'batch_id': self.batch_id,
+            'batch_position': self._batch_position,
+            'batch_total': self._batch_total,
+            'batch_message': self._batch_message,
         }
 
     def update_status(self, status: JobStatus, **kwargs):
@@ -179,6 +198,7 @@ class JobStore:
                 'is_group_primary': job.is_group_primary,
                 'destination_exists': job.destination_exists,
                 'force_overwrite': job.force_overwrite,
+                'batch_id': job.batch_id,
             })
         try:
             with open(PENDING_JOBS_FILE, 'w') as f:
@@ -239,6 +259,7 @@ class JobStore:
                 job.is_group_primary = item.get('is_group_primary', False)
                 job.destination_exists = item.get('destination_exists', False)
                 job.force_overwrite = item.get('force_overwrite', False)
+                job.batch_id = item.get('batch_id')
                 self._jobs[job.job_id] = job
                 loaded += 1
         
@@ -290,3 +311,121 @@ class JobStore:
                 if job_base_name == base_name:
                     return job
             return None
+
+    def search_queue(self, query: str, max_results: int = 20,
+                     include_completed: bool = False,
+                     include_failed: bool = False) -> List[Dict]:
+        """Search ALL jobs in the queue (not just PENDING_COMPLETION).
+        
+        Designed for the AI search_queue tool. Searches across QUEUED, PROCESSING,
+        PENDING_COMPLETION, and AGENT_NAMED statuses.
+        
+        Args:
+            query: Substring to match against relative_path and suggested_name.
+            max_results: Maximum results to return.
+            include_completed: Also search completed jobs.
+            include_failed: Also search failed jobs.
+            
+        Returns:
+            List of {job_id, relative_path, status, suggested_name, confidence, ext, batch_id} dicts.
+        """
+        with self._lock:
+            all_jobs = list(self._jobs.values())
+        
+        query_lower = query.lower().strip()
+        results = []
+        
+        for job in all_jobs:
+            if not include_completed and job.status == JobStatus.COMPLETED:
+                continue
+            if not include_failed and job.status == JobStatus.FAILED:
+                continue
+            
+            rel_path = (job.relative_path or '').lower()
+            ai_name = (job.suggested_name or '').lower()
+            base = os.path.splitext(os.path.basename(job.relative_path or ''))[0].lower()
+            
+            matched = False
+            if not query_lower:
+                matched = True
+            elif query_lower in rel_path or query_lower in ai_name or query_lower in base:
+                matched = True
+            
+            if matched:
+                _, ext = os.path.splitext(job.relative_path or '')
+                results.append({
+                    'job_id': job.job_id,
+                    'relative_path': job.relative_path,
+                    'status': job.status.value,
+                    'suggested_name': job.suggested_name,
+                    'confidence': job.confidence,
+                    'extension': ext,
+                    'batch_id': job.batch_id,
+                    'group_id': job.group_id,
+                })
+            
+            if len(results) >= max_results:
+                break
+        
+        return results
+
+    def smart_group_jobs(self, pattern: str, job_ids: Optional[List[str]] = None) -> Dict:
+        """Create a smart group from matching jobs or explicit job IDs.
+        
+        Args:
+            pattern: Regex pattern to match job paths, or 'tv', 'book', 'multi_format'.
+            job_ids: Optional explicit list of job IDs to group together.
+            
+        Returns:
+            Dict with batch_id, count, and list of relative_paths.
+        """
+        import re
+        
+        with self._lock:
+            if job_ids:
+                target_jobs = [self._jobs[jid] for jid in job_ids if jid in self._jobs]
+            else:
+                target_jobs = [j for j in self._jobs.values()
+                              if j.status in BATCH_PROCESSABLE_STATUSES]
+            
+            if pattern == 'tv':
+                target_jobs = [j for j in target_jobs
+                              if re.search(TV_EPISODE_PATTERN, os.path.basename(j.relative_path))]
+            elif pattern == 'multi_format':
+                target_jobs = [j for j in target_jobs
+                              if os.path.splitext(j.relative_path)[1].lower() in
+                              (MEDIA_EXTENSIONS | SUBTITLE_EXTENSIONS | BOOK_EXTENSIONS |
+                               AUDIOBOOK_EXTENSIONS | COMIC_EXTENSIONS)]
+            
+            if not target_jobs:
+                return {'batch_id': '', 'count': 0, 'files': []}
+            
+            batch_id = str(uuid.uuid4())
+            for job in target_jobs:
+                if job.status == JobStatus.QUEUED_FOR_AI:
+                    job.batch_id = batch_id
+                    job._batch_total = len(target_jobs)
+            
+            paths = [j.relative_path for j in target_jobs]
+            return {
+                'batch_id': batch_id,
+                'count': len(target_jobs),
+                'files': paths,
+            }
+
+    def get_jobs_by_batch(self, batch_id: str) -> List[Job]:
+        """Get all jobs that belong to a smart agent batch."""
+        with self._lock:
+            return [j for j in self._jobs.values() if j.batch_id == batch_id]
+
+    def update_job_batch_status(self, job_id: str, position: int = 0,
+                                 total: int = 0, message: str = "") -> bool:
+        """Update batch progress fields on a job (for UI display)."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job:
+                job._batch_position = position
+                job._batch_total = total
+                job._batch_message = message
+                return True
+            return False

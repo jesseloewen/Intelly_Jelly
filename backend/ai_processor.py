@@ -8,6 +8,7 @@ from openai import OpenAI
 from backend.tmdb_api import TMDBClient, format_tool_response
 from backend.openlibrary_api import OpenLibraryClient, format_openlibrary_response
 from backend.comicvine_api import ComicVineClient, format_comicvine_response
+from backend.job_store import JobStatus
 
 logger = logging.getLogger(__name__)
 
@@ -546,6 +547,204 @@ class AIProcessor:
                 }
             }
         ]
+
+    def _get_search_queue_tool_definition_google(self) -> Optional[Dict]:
+        if not self.job_store:
+            return None
+        return {
+            "function_declarations": [
+                {
+                    "name": "search_queue",
+                    "description": "Search ALL jobs currently in the processing queue (queued, processing, agent-named, pending completion). Use this to find related files that should be processed together in a batch - e.g., other episodes of the same TV season, other chapters of a book, or files with the same base name but different extensions (like .mkv + .srt or .pdf + .epub). This is the primary tool for discovering files to batch-process.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "Search term to find related files. Use the show name, book title, base filename, or part of a path. Use empty string '' to list all queued files."
+                            },
+                            "max_results": {
+                                "type": "integer",
+                                "description": "Maximum results to return (default 30)"
+                            }
+                        },
+                        "required": ["query"]
+                    }
+                }
+            ]
+        }
+
+    def _get_search_queue_tools_for_openai(self) -> List[Dict]:
+        if not self.job_store:
+            return []
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_queue",
+                    "description": "Search ALL jobs currently in the processing queue (queued, processing, agent-named, pending completion). Use this to find related files that should be processed together in a batch - e.g., other episodes of the same TV season, other chapters of a book, or files with the same base name but different extensions (like .mkv + .srt or .pdf + .epub). This is the primary tool for discovering files to batch-process.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "Search term to find related files. Use the show name, book title, base filename, or part of a path. Use empty string '' to list all queued files."
+                            },
+                            "max_results": {
+                                "type": "integer",
+                                "description": "Maximum results to return (default 30)"
+                            }
+                        },
+                        "required": ["query"]
+                    }
+                }
+            }
+        ]
+
+    def _get_set_name_tool_definition_google(self) -> Dict:
+        return {
+            "function_declarations": [
+                {
+                    "name": "set_name",
+                    "description": "Set the final destination name and path for a specific file. Call this for EACH file in your batch after you have determined its correct name. The suggested_name must follow the exact naming conventions (e.g., 'TV Shows/Show Name (Year)/Season XX/Show Name (Year) - SXXEYY - Episode Name.ext'). After naming all files in the batch, call finish_group.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "original_path": {
+                                "type": "string",
+                                "description": "The exact original file path (relative_path) from the input or search results"
+                            },
+                            "suggested_name": {
+                                "type": "string",
+                                "description": "The full destination path including category, folders, and filename. Must follow the naming conventions exactly."
+                            },
+                            "confidence": {
+                                "type": "integer",
+                                "description": "Confidence score from 0 to 100"
+                            }
+                        },
+                        "required": ["original_path", "suggested_name", "confidence"]
+                    }
+                }
+            ]
+        }
+
+    def _get_set_name_tools_for_openai(self) -> List[Dict]:
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "set_name",
+                    "description": "Set the final destination name and path for a specific file. Call this for EACH file in your batch after you have determined its correct name. The suggested_name must follow the exact naming conventions (e.g., 'TV Shows/Show Name (Year)/Season XX/Show Name (Year) - SXXEYY - Episode Name.ext'). After naming all files in the batch, call finish_group.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "original_path": {
+                                "type": "string",
+                                "description": "The exact original file path (relative_path) from the input or search results"
+                            },
+                            "suggested_name": {
+                                "type": "string",
+                                "description": "The full destination path including category, folders, and filename. Must follow the naming conventions exactly."
+                            },
+                            "confidence": {
+                                "type": "integer",
+                                "description": "Confidence score from 0 to 100"
+                            }
+                        },
+                        "required": ["original_path", "suggested_name", "confidence"]
+                    }
+                }
+            }
+        ]
+
+    def _get_finish_group_tool_definition_google(self) -> Dict:
+        return {
+            "function_declarations": [
+                {
+                    "name": "finish_group",
+                    "description": "Mark the current batch of files as complete. Call this ONCE after you have used set_name for every file in the batch. This finalizes all files and transitions them to pending completion so they can be moved to the library. Do NOT call this until ALL files in the batch have been named.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "note": {
+                                "type": "string",
+                                "description": "Optional summary note about what was processed (e.g., 'Named 10 episodes of The Office S01')"
+                            }
+                        },
+                        "required": []
+                    }
+                }
+            ]
+        }
+
+    def _get_finish_group_tools_for_openai(self) -> List[Dict]:
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "finish_group",
+                    "description": "Mark the current batch of files as complete. Call this ONCE after you have used set_name for every file in the batch. This finalizes all files and transitions them to pending completion so they can be moved to the library. Do NOT call this until ALL files in the batch have been named.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "note": {
+                                "type": "string",
+                                "description": "Optional summary note about what was processed (e.g., 'Named 10 episodes of The Office S01')"
+                            }
+                        },
+                        "required": []
+                    }
+                }
+            }
+        ]
+
+    def _get_smart_group_tool_definition_google(self) -> Optional[Dict]:
+        if not self.job_store:
+            return None
+        return {
+            "function_declarations": [
+                {
+                    "name": "smart_group",
+                    "description": "Dynamically group related queued files into the current processing batch. Use this to pull in additional files you discover are related (same TV show season, same book, same movie with subtitles). The system will add them to your current batch so you can name them all together.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "job_ids": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "List of job_ids to add to the current batch"
+                            }
+                        },
+                        "required": ["job_ids"]
+                    }
+                }
+            ]
+        }
+
+    def _get_smart_group_tools_for_openai(self) -> List[Dict]:
+        if not self.job_store:
+            return []
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "smart_group",
+                    "description": "Dynamically group related queued files into the current processing batch. Use this to pull in additional files you discover are related (same TV show season, same book, same movie with subtitles). The system will add them to your current batch so you can name them all together.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "job_ids": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "List of job_ids to add to the current batch"
+                            }
+                        },
+                        "required": ["job_ids"]
+                    }
+                }
+            }
+        ]
     
     def _execute_tmdb_function(self, function_name: str, args: Dict) -> str:
         """Execute a TMDB or Open Library function call and return formatted response."""
@@ -632,6 +831,46 @@ class AIProcessor:
                 if not results:
                     return "No matching pending jobs found"
                 return json.dumps(results, indent=2)
+
+            elif function_name == "search_queue":
+                if not self.job_store:
+                    return "Queue search tool is not available"
+                results = self.job_store.search_queue(
+                    args.get("query", ""),
+                    max_results=args.get("max_results", 30)
+                )
+                if not results:
+                    return "No matching queued files found"
+                return json.dumps(results, indent=2)
+
+            elif function_name == "smart_group":
+                if not self.job_store:
+                    return "Smart grouping tool is not available"
+                job_ids = args.get("job_ids", [])
+                if not job_ids:
+                    return "No job_ids provided for smart_group"
+                result = self.job_store.smart_group_jobs("", job_ids=job_ids)
+                return json.dumps(result, indent=2)
+
+            elif function_name == "set_name":
+                if not self.job_store:
+                    return "Set name tool is not available"
+                original_path = args.get("original_path", "")
+                suggested_name = args.get("suggested_name", "")
+                confidence = args.get("confidence", 0)
+                job = self.job_store.get_job_by_path(original_path)
+                if not job:
+                    return json.dumps({"error": f"No queued job found for path: {original_path}", "status": "not_found"})
+                self.job_store.update_job(
+                    job.job_id,
+                    JobStatus.AGENT_NAMED,
+                    suggested_name=suggested_name,
+                    confidence=confidence,
+                )
+                return json.dumps({"status": "ok", "job_id": job.job_id, "named": os.path.basename(original_path)})
+
+            elif function_name == "finish_group":
+                return json.dumps({"status": "finish_group_requested", "note": args.get("note", "")})
             
             else:
                 return f"Unknown function: {function_name}"
@@ -755,19 +994,19 @@ class AIProcessor:
         
         return prompt
 
-    def process_single(self, file_path: str, custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> Optional[Dict]:
+    def process_single(self, file_path: str, custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, enable_search_queue_tool: bool = False, enable_agent_tools: bool = False, on_event: Optional[Callable] = None) -> Optional[Dict]:
         """Process a single file using configured AI with optional web search and tools."""
         logger.info(f"Starting AI processing for file: {file_path}")
-        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}, ComicVine tool: {enable_comicvine_tool}, Library tool: {enable_library_tool}, Pending tool: {enable_pending_tool}")
+        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}, ComicVine tool: {enable_comicvine_tool}, Library tool: {enable_library_tool}, Pending tool: {enable_pending_tool}, Search Queue: {enable_search_queue_tool}, Agent: {enable_agent_tools}")
         
-        results = self.process_batch([file_path], custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, on_event=on_event)
+        results = self.process_batch([file_path], custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, enable_search_queue_tool, enable_agent_tools, on_event=on_event)
         return results[0] if results else None
     
-    def process_batch(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def process_batch(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, enable_search_queue_tool: bool = False, enable_agent_tools: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using configured AI provider with optional web search and tools."""
         logger.info(f"Starting AI processing for {len(file_paths)} file(s)")
         logger.debug(f"Files to process: {file_paths}")
-        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}, ComicVine tool: {enable_comicvine_tool}, Library tool: {enable_library_tool}, Pending tool: {enable_pending_tool}")
+        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}, ComicVine tool: {enable_comicvine_tool}, Library tool: {enable_library_tool}, Pending tool: {enable_pending_tool}, Search Queue: {enable_search_queue_tool}, Agent: {enable_agent_tools}")
         
         # Override enable_tmdb_tool based on actual config state (if not explicitly disabled)
         if enable_tmdb_tool:
@@ -804,13 +1043,13 @@ class AIProcessor:
         logger.info(f"Using AI provider: {provider}")
         
         if provider == 'openai':
-            return self._process_batch_openai(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, on_event=on_event)
+            return self._process_batch_openai(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, enable_search_queue_tool, enable_agent_tools, on_event=on_event)
         elif provider == "openrouter":
-            return self._process_batch_openrouter(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, on_event=on_event)
+            return self._process_batch_openrouter(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, enable_search_queue_tool, enable_agent_tools, on_event=on_event)
         elif provider == "ollama":
-            return self._process_batch_ollama(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, on_event=on_event)
+            return self._process_batch_ollama(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, enable_search_queue_tool, enable_agent_tools, on_event=on_event)
         elif provider == "google" or provider == "custom":
-            return self._process_batch_google(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, on_event=on_event)
+            return self._process_batch_google(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, enable_search_queue_tool, enable_agent_tools, on_event=on_event)
     
     def _process_batch_google(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using Google AI with optional web search and tools."""
