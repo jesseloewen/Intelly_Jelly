@@ -942,6 +942,9 @@
                             <small>Enter the exact model name (e.g., gemini-1.5-pro, gpt-4)</small>
                         </div>
                         
+                        <hr style="border: none; border-top: 1px solid var(--input-border); margin: 25px 0 20px 0;">
+                        <h4 style="color: var(--heading-color); margin-bottom: 15px; font-size: 16px;">Tools</h4>
+                        
                         <div class="form-group">
                             <div class="checkbox-group">
                                 <input type="checkbox" id="web-search" name="ENABLE_WEB_SEARCH">
@@ -956,6 +959,16 @@
                                 <label for="tmdb-tool">Enable TMDB Tool</label>
                             </div>
                             <small>Allow AI to query The Movie Database for accurate movie/TV show information (all providers)</small>
+                        </div>
+                        
+                        <div class="form-group" id="tmdb-api-key-group" style="display: none;">
+                            <label for="tmdb-api-key">TMDB API Key</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="text" id="tmdb-api-key" name="TMDB_API_KEY" placeholder="Enter TMDB API Key" style="flex: 1;">
+                                <button type="button" id="reveal-tmdb-key" class="reveal-key-btn" style="display: none;" onclick="toggleRevealKey('tmdb')">👁️</button>
+                                <button type="button" id="delete-tmdb-key" class="delete-key-btn" style="display: none;" onclick="deleteApiKey('tmdb')">Delete</button>
+                            </div>
+                            <small>Required for TMDB tool. Get your API key from <a href="https://www.themoviedb.org/settings/api" target="_blank">TMDB Settings</a></small>
                         </div>
                         
                         <div class="form-group">
@@ -998,16 +1011,6 @@
                                 <label for="pending-tool">Enable Pending Jobs Tool</label>
                             </div>
                             <small>Allow AI to search previously generated file names for consistency. Ensures new suggestions match the naming style of other pending files.</small>
-                        </div>
-                        
-                        <div class="form-group" id="tmdb-api-key-group" style="display: none;">
-                            <label for="tmdb-api-key">TMDB API Key</label>
-                            <div style="display: flex; gap: 10px; align-items: center;">
-                                <input type="text" id="tmdb-api-key" name="TMDB_API_KEY" placeholder="Enter TMDB API Key" style="flex: 1;">
-                                <button type="button" id="reveal-tmdb-key" class="reveal-key-btn" style="display: none;" onclick="toggleRevealKey('tmdb')">👁️</button>
-                                <button type="button" id="delete-tmdb-key" class="delete-key-btn" style="display: none;" onclick="deleteApiKey('tmdb')">Delete</button>
-                            </div>
-                            <small>Required for TMDB tool. Get your API key from <a href="https://www.themoviedb.org/settings/api" target="_blank">TMDB Settings</a></small>
                         </div>
                         
                         <div class="form-group">
