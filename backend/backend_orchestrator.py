@@ -371,6 +371,18 @@ class BackendOrchestrator:
                 if key not in chapter_groups:
                     chapter_groups[key] = []
                 chapter_groups[key].append((ch_num, job))
+                continue
+
+            # Look for mid-filename numbered segments: "Prefix - 06 Name"
+            # e.g. "Corey, James S. A. - The Expanse 5.0 - Nemesis Games - 06 Alex"
+            mid_match = re.match(r'^(.+?)\s*[-–]\s*(\d{2,4})\b\s*(.*)', basename)
+            if mid_match:
+                common_prefix = mid_match.group(1).strip()
+                ch_num = int(mid_match.group(2))
+                key = f"{prefix}/{common_prefix}"
+                if key not in chapter_groups:
+                    chapter_groups[key] = []
+                chapter_groups[key].append((ch_num, job))
         
         batches = []
         for key, entries in chapter_groups.items():
