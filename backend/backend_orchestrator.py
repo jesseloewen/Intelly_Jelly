@@ -465,19 +465,10 @@ class BackendOrchestrator:
                 batch_found = True
                 break
         
-        # If no batch is ready (all waiting for patience), process the oldest one anyway
+        # If no batch is ready (all waiting for patience), skip this iteration
+        # The queue worker will loop and try again; jobs will age and eventually pass the patience check
         if not batch_found:
-            # Force process the first batch regardless of patience
-            for batch in batches:
-                if batch:
-                    self._process_agent_batch(batch)
-                    self._last_processing_time = time.time()
-                    break
-            else:
-                # If somehow no batch, process individual jobs
-                if non_priority:
-                    job = non_priority[0]
-                    self._process_single_job(job)
+            logger.debug("No batch ready — all batches waiting for patience window")
 
     def _process_agent_batch(self, batch: List):
         """Process a batch of jobs through the Smart Agent."""
