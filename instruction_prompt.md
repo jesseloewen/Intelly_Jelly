@@ -23,6 +23,10 @@ You are processing a batch of files that the system has already grouped (by TV s
   "comicvine": [
     {"type": "volume", "name": "Batman"}
   ],
+  "musicbrainz": [
+    {"type": "release_group", "name": "The Dark Side of the Moon", "artist": "Pink Floyd"},
+    {"type": "release", "name": "The Dark Side of the Moon", "artist": "Pink Floyd"}
+  ],
   "library_searches": [
     {"query": "The Office", "category": "tv"}
   ],
@@ -35,7 +39,7 @@ You are processing a batch of files that the system has already grouped (by TV s
 ### 2. 🔍 General Rules
 
 1. **Process Every File:** Include every file from the batch in `set_names`. Never skip.
-2. **Metadata via plan_lookups:** Declare all lookups at once. Use `tmdb` for movies/TV, `openlibrary` for books/authors, `comicvine` for comics. Include `library_searches` and `queue_searches` to find duplicates and related files.
+2. **Metadata via plan_lookups:** Declare all lookups at once. Use `tmdb` for movies/TV, `openlibrary` for books/authors, `comicvine` for comics, `musicbrainz` for music. Include `library_searches` and `queue_searches` to find duplicates and related files.
 3. **set_names format:** Pass an array of `{original_path, suggested_name, confidence}`. The `original_path` must match exactly the `relative_path` from the input.
 4. **Flat Folder Structure (Media):** For Movies, TV Shows, Music, and Books, follow defined folder structures exactly. Extra nesting in the original path must be flattened into the filename using ` - `. Software and Other keep their subfolder structure.
 5. **Detect Media Type from Extension & Context:**
@@ -70,6 +74,11 @@ You are processing a batch of files that the system has already grouped (by TV s
 #### 🎵 Music
   * **Path:** `Music/Artist/Album/TT - Song Title.ext`
   * Multi-disc: `Disc X` subfolders.
+  * **Album tracks:** Use `plan_lookups` with `musicbrainz` to find the album (`release_group`) and then the specific `release` to get track numbers. Each track goes in the album folder as `TT - Song Title.ext` (TT = zero-padded track number from MusicBrainz).
+  * **Single tracks part of an album:** Even if only ONE song from an album is in the batch, still create the full album folder structure (`Music/Artist/Album/TT - Song Title.ext`) with the correct track number. This ensures future songs from the same album get placed in the same folder with correct numbering.
+  * **Release variants (Deluxe, Single, Remastered, etc.):** Treat different release variants as separate albums. A "Deluxe Version" release gets its own folder with the tag preserved: `Music/Artist/Album (Deluxe Version)/TT - Song Title.ext`. A single gets its own folder: `Music/Artist/Album (Single)/TT - Song Title.ext`. Use MusicBrainz `search_music_release` to identify the correct release variant and its track listing.
+  * **Loose/standalone singles:** If a track does not belong to any album (standalone single), place it directly under artist: `Music/Artist/TT - Song Title.ext`.
+  * **Tip:** When using `plan_lookups`, declare `musicbrainz` lookups with `{"type": "release_group", "name": "Album Name", "artist": "Artist Name"}` first, then if needed `{"type": "release", "name": "Album Name", "artist": "Artist Name"}` to identify the exact release variant. Use `get_music_tracks` tool (via `search_music_release` then using the release ID) to get the full track list with positions.
 
 #### 📚 Books
   * **eBooks:** `Books/Books/[Author]/[Book Title (Year)]/Book Title (Year).ext`

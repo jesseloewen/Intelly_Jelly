@@ -52,6 +52,7 @@ class Job:
         self.enable_tmdb_tool: bool = False
         self.enable_openlibrary_tool: bool = False
         self.enable_comicvine_tool: bool = False
+        self.enable_musicbrainz_tool: bool = False
         self.retry_count: int = 0
         self.max_retries: int = 3
         self._missing_since: Optional[float] = None
@@ -192,6 +193,7 @@ class JobStore:
                 'enable_tmdb_tool': job.enable_tmdb_tool,
                 'enable_openlibrary_tool': job.enable_openlibrary_tool,
                 'enable_comicvine_tool': job.enable_comicvine_tool,
+                'enable_musicbrainz_tool': job.enable_musicbrainz_tool,
                 'retry_count': job.retry_count,
                 'max_retries': job.max_retries,
                 'group_id': job.group_id,
@@ -253,6 +255,7 @@ class JobStore:
                 job.enable_tmdb_tool = item.get('enable_tmdb_tool', False)
                 job.enable_openlibrary_tool = item.get('enable_openlibrary_tool', False)
                 job.enable_comicvine_tool = item.get('enable_comicvine_tool', False)
+                job.enable_musicbrainz_tool = item.get('enable_musicbrainz_tool', False)
                 job.retry_count = item.get('retry_count', 0)
                 job.max_retries = item.get('max_retries', 3)
                 job.group_id = item.get('group_id')

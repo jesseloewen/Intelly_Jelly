@@ -60,6 +60,7 @@ class ConfigManager:
             "ENABLE_TMDB_TOOL": False,
             "ENABLE_OPENLIBRARY_TOOL": False,
             "ENABLE_COMICVINE_TOOL": False,
+            "ENABLE_MUSICBRAINZ_TOOL": False,
             "ENABLE_LIBRARY_TOOL": True,
             "ENABLE_PENDING_TOOL": True,
             "ENABLE_SEARCH_QUEUE_TOOL": True,

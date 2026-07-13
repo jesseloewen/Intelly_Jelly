@@ -12,6 +12,7 @@ from backend.job_store import JobStore, JobStatus
 from backend.tmdb_api import TMDBClient, format_tool_response
 from backend.openlibrary_api import OpenLibraryClient, format_openlibrary_response
 from backend.comicvine_api import ComicVineClient, format_comicvine_response
+from backend.musicbrainz_api import MusicBrainzClient, format_musicbrainz_response
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ MAX_CONVERSATION_TURNS = 10
 AGENT_SYSTEM_PROMPT = """You are an expert media file organizer agent. Process batches of files by assigning each a proper destination path.
 
 CRITICAL WORKFLOW (2-3 steps):
-1. Call plan_lookups ONCE to declare ALL metadata you need (shows, books, movies, library searches, queue searches). This is the KEY to efficiency — declare everything upfront.
+1. Call plan_lookups ONCE to declare ALL metadata you need (shows, books, movies, music, library searches, queue searches). This is the KEY to efficiency — declare everything upfront.
 2. The system will return ALL metadata results combined. Do NOT call individual metadata tools.
 3. Call set_names ONCE with ALL files' names. Then call finish_group().
 
@@ -50,6 +51,7 @@ class SmartAgent:
         self.tmdb_client: Optional[TMDBClient] = None
         self.openlibrary_client: Optional[OpenLibraryClient] = None
         self.comicvine_client: Optional[ComicVineClient] = None
+        self.musicbrainz_client: Optional[MusicBrainzClient] = None
         self.openai_client: Optional[OpenAI] = None
         self.openrouter_client: Optional[OpenAI] = None
         self.last_api_call_time = 0
@@ -85,10 +87,18 @@ class SmartAgent:
             self.comicvine_client = ComicVineClient(api_key)
         return self.comicvine_client
 
+    def _get_musicbrainz_client(self) -> Optional[MusicBrainzClient]:
+        if not self.config_manager.get('ENABLE_MUSICBRAINZ_TOOL', False):
+            return None
+        if not self.musicbrainz_client:
+            self.musicbrainz_client = MusicBrainzClient()
+        return self.musicbrainz_client
+
     def _get_plan_lookups_tool(self) -> Dict:
         has_tmdb = bool(self._get_tmdb_client())
         has_ol = bool(self._get_openlibrary_client())
         has_cv = bool(self._get_comicvine_client())
+        has_mb = bool(self._get_musicbrainz_client())
         
         return {
             "type": "function",
@@ -131,6 +141,19 @@ class SmartAgent:
                                 "properties": {
                                     "type": {"type": "string", "enum": ["volume", "issue"]},
                                     "name": {"type": "string"}
+                                },
+                                "required": ["type", "name"]
+                            }
+                        },
+                        "musicbrainz": {
+                            "type": "array",
+                            "description": "MusicBrainz lookups. Types: 'artist', 'release', 'release_group', 'track'. For release and release_group, you may also provide optional 'artist' field to narrow results.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {"type": "string", "enum": ["artist", "release", "release_group", "track"]},
+                                    "name": {"type": "string"},
+                                    "artist": {"type": "string", "description": "Optional artist name to narrow release/track search results"}
                                 },
                                 "required": ["type", "name"]
                             }
@@ -246,6 +269,7 @@ class SmartAgent:
         tmdb_lookups = args.get("tmdb", [])
         ol_lookups = args.get("openlibrary", [])
         cv_lookups = args.get("comicvine", [])
+        mb_lookups = args.get("musicbrainz", [])
         lib_searches = args.get("library_searches", [])
         queue_searches = args.get("queue_searches", [])
         
@@ -297,6 +321,27 @@ class SmartAgent:
             elif lookup_type == "issue":
                 tasks.append(lambda n=name, c=cv_client: safe_lookup(f"comicvine:issue:{n}",
                     lambda: format_comicvine_response(c.search_issue(n), "issue")))
+        
+        # Build MusicBrainz tasks
+        mb_client = self._get_musicbrainz_client()
+        for item in mb_lookups:
+            lookup_type = item.get("type", "")
+            name = item.get("name", "")
+            artist = item.get("artist")
+            if not mb_client:
+                continue
+            if lookup_type == "artist":
+                tasks.append(lambda n=name, c=mb_client: safe_lookup(f"musicbrainz:artist:{n}",
+                    lambda: format_musicbrainz_response(c.search_artist(n), "artist")))
+            elif lookup_type == "release":
+                tasks.append(lambda n=name, a=artist, c=mb_client: safe_lookup(f"musicbrainz:release:{n}",
+                    lambda: format_musicbrainz_response(c.search_release(n, a), "release")))
+            elif lookup_type == "release_group":
+                tasks.append(lambda n=name, a=artist, c=mb_client: safe_lookup(f"musicbrainz:release_group:{n}",
+                    lambda: format_musicbrainz_response(c.search_release_group(n, a), "release_group")))
+            elif lookup_type == "track":
+                tasks.append(lambda n=name, a=artist, c=mb_client: safe_lookup(f"musicbrainz:track:{n}",
+                    lambda: format_musicbrainz_response(c.search_track(n, a), "track")))
         
         # Build library search tasks
         for item in lib_searches:
@@ -693,6 +738,7 @@ class SmartAgent:
                                 "tmdb": {"type": "array", "items": {"type": "object", "properties": {"type": {"type": "string"}, "name": {"type": "string"}, "season": {"type": "integer"}}, "required": ["type", "name"]}},
                                 "openlibrary": {"type": "array", "items": {"type": "object", "properties": {"type": {"type": "string"}, "name": {"type": "string"}}, "required": ["type", "name"]}},
                                 "comicvine": {"type": "array", "items": {"type": "object", "properties": {"type": {"type": "string"}, "name": {"type": "string"}}, "required": ["type", "name"]}},
+                                "musicbrainz": {"type": "array", "items": {"type": "object", "properties": {"type": {"type": "string"}, "name": {"type": "string"}, "artist": {"type": "string"}}, "required": ["type", "name"]}},
                                 "library_searches": {"type": "array", "items": {"type": "object", "properties": {"query": {"type": "string"}, "category": {"type": "string"}}, "required": ["query"]}},
                                 "queue_searches": {"type": "array", "items": {"type": "object", "properties": {"query": {"type": "string"}, "max_results": {"type": "integer"}}, "required": ["query"]}},
                             },

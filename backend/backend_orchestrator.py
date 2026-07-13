@@ -139,6 +139,7 @@ class BackendOrchestrator:
         job.enable_tmdb_tool = self.config_manager.get('ENABLE_TMDB_TOOL', False)
         job.enable_openlibrary_tool = self.config_manager.get('ENABLE_OPENLIBRARY_TOOL', False)
         job.enable_comicvine_tool = self.config_manager.get('ENABLE_COMICVINE_TOOL', False)
+        job.enable_musicbrainz_tool = self.config_manager.get('ENABLE_MUSICBRAINZ_TOOL', False)
         
         if existing_group_job and existing_group_job.group_id:
             # Add this job to the existing group
@@ -547,6 +548,7 @@ class BackendOrchestrator:
             enable_tmdb_tool = getattr(primary_job, 'enable_tmdb_tool', self.config_manager.get('ENABLE_TMDB_TOOL', False))
             enable_openlibrary_tool = getattr(primary_job, 'enable_openlibrary_tool', self.config_manager.get('ENABLE_OPENLIBRARY_TOOL', False))
             enable_comicvine_tool = getattr(primary_job, 'enable_comicvine_tool', self.config_manager.get('ENABLE_COMICVINE_TOOL', False))
+            enable_musicbrainz_tool = getattr(primary_job, 'enable_musicbrainz_tool', self.config_manager.get('ENABLE_MUSICBRAINZ_TOOL', False))
             enable_library_tool = getattr(primary_job, 'enable_library_tool', self.config_manager.get('ENABLE_LIBRARY_TOOL', False)) if hasattr(primary_job, 'enable_library_tool') else self.config_manager.get('ENABLE_LIBRARY_TOOL', False)
             enable_pending_tool = getattr(primary_job, 'enable_pending_tool', self.config_manager.get('ENABLE_PENDING_TOOL', False)) if hasattr(primary_job, 'enable_pending_tool') else self.config_manager.get('ENABLE_PENDING_TOOL', False)
             
@@ -560,6 +562,7 @@ class BackendOrchestrator:
                 enable_tmdb_tool=enable_tmdb_tool,
                 enable_openlibrary_tool=enable_openlibrary_tool,
                 enable_comicvine_tool=enable_comicvine_tool,
+                enable_musicbrainz_tool=enable_musicbrainz_tool,
                 enable_library_tool=enable_library_tool,
                 enable_pending_tool=enable_pending_tool,
                 on_event=self.ai_sse_broker.publish
@@ -649,6 +652,7 @@ class BackendOrchestrator:
             enable_tmdb_tool = getattr(job, 'enable_tmdb_tool', self.config_manager.get('ENABLE_TMDB_TOOL', False))
             enable_openlibrary_tool = getattr(job, 'enable_openlibrary_tool', self.config_manager.get('ENABLE_OPENLIBRARY_TOOL', False))
             enable_comicvine_tool = getattr(job, 'enable_comicvine_tool', self.config_manager.get('ENABLE_COMICVINE_TOOL', False))
+            enable_musicbrainz_tool = getattr(job, 'enable_musicbrainz_tool', self.config_manager.get('ENABLE_MUSICBRAINZ_TOOL', False))
             enable_library_tool = getattr(job, 'enable_library_tool', self.config_manager.get('ENABLE_LIBRARY_TOOL', False)) if hasattr(job, 'enable_library_tool') else self.config_manager.get('ENABLE_LIBRARY_TOOL', False)
             enable_pending_tool = getattr(job, 'enable_pending_tool', self.config_manager.get('ENABLE_PENDING_TOOL', False)) if hasattr(job, 'enable_pending_tool') else self.config_manager.get('ENABLE_PENDING_TOOL', False)
             
@@ -663,6 +667,7 @@ class BackendOrchestrator:
                 enable_tmdb_tool=enable_tmdb_tool,
                 enable_openlibrary_tool=enable_openlibrary_tool,
                 enable_comicvine_tool=enable_comicvine_tool,
+                enable_musicbrainz_tool=enable_musicbrainz_tool,
                 enable_library_tool=enable_library_tool,
                 enable_pending_tool=enable_pending_tool,
                 on_event=self.ai_sse_broker.publish
@@ -907,7 +912,7 @@ class BackendOrchestrator:
         
         return True
 
-    def re_ai_job(self, job_id: str, custom_prompt: Optional[str] = None, include_instructions: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False):
+    def re_ai_job(self, job_id: str, custom_prompt: Optional[str] = None, include_instructions: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_musicbrainz_tool: bool = False):
         logger.info(f"Re-AI requested for job {job_id}")
         logger.debug(f"Custom prompt: {bool(custom_prompt)}, Include instructions: {include_instructions}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}, ComicVine tool: {enable_comicvine_tool}")
         
@@ -927,7 +932,8 @@ class BackendOrchestrator:
             enable_web_search=enable_web_search,
             enable_tmdb_tool=enable_tmdb_tool,
             enable_openlibrary_tool=enable_openlibrary_tool,
-            enable_comicvine_tool=enable_comicvine_tool
+            enable_comicvine_tool=enable_comicvine_tool,
+            enable_musicbrainz_tool=enable_musicbrainz_tool
         )
         logger.info(f"Job {job_id} marked as QUEUED_FOR_AI with priority=True")
         

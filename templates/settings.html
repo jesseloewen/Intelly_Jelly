@@ -999,6 +999,14 @@
                         
                         <div class="form-group">
                             <div class="checkbox-group">
+                                <input type="checkbox" id="musicbrainz-tool" name="ENABLE_MUSICBRAINZ_TOOL">
+                                <label for="musicbrainz-tool">Enable MusicBrainz Tool</label>
+                            </div>
+                            <small>Allow AI to query MusicBrainz for accurate music metadata: artists, albums, tracks, release dates, and track listings (all providers, no API key required)</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <div class="checkbox-group">
                                 <input type="checkbox" id="library-tool" name="ENABLE_LIBRARY_TOOL">
                                 <label for="library-tool">Enable Library Search Tool</label>
                             </div>
@@ -1585,6 +1593,9 @@
                 comicvineToolCheckbox.checked = currentConfig.ENABLE_COMICVINE_TOOL || false;
                 comicvineApiKeyGroup.style.display = comicvineToolCheckbox.checked ? 'block' : 'none';
                 
+                const musicbrainzToolCheckbox = document.getElementById('musicbrainz-tool');
+                musicbrainzToolCheckbox.checked = currentConfig.ENABLE_MUSICBRAINZ_TOOL || false;
+                
                 const libraryToolCheckbox = document.getElementById('library-tool');
                 libraryToolCheckbox.checked = currentConfig.ENABLE_LIBRARY_TOOL || false;
                 
@@ -1861,6 +1872,7 @@
             config.ENABLE_TMDB_TOOL = document.getElementById('tmdb-tool').checked;
             config.ENABLE_OPENLIBRARY_TOOL = document.getElementById('openlibrary-tool').checked;
             config.ENABLE_COMICVINE_TOOL = document.getElementById('comicvine-tool').checked;
+            config.ENABLE_MUSICBRAINZ_TOOL = document.getElementById('musicbrainz-tool').checked;
             config.ENABLE_LIBRARY_TOOL = document.getElementById('library-tool').checked;
             config.ENABLE_PENDING_TOOL = document.getElementById('pending-tool').checked;
             config.ENABLE_SEARCH_QUEUE_TOOL = document.getElementById('search-queue-tool').checked;
@@ -1868,7 +1880,7 @@
             config.BATCH_PATIENCE_SECONDS = parseInt(document.getElementById('batch-patience').value) || 30;
             
             for (const [key, value] of formData.entries()) {
-                if (key === 'ENABLE_WEB_SEARCH' || key === 'JELLYFIN_REFRESH_ENABLED' || key === 'ENABLE_TMDB_TOOL' || key === 'ENABLE_OPENLIBRARY_TOOL' || key === 'ENABLE_COMICVINE_TOOL' || key === 'ENABLE_LIBRARY_TOOL' || key === 'ENABLE_PENDING_TOOL' || key === 'ENABLE_SEARCH_QUEUE_TOOL' || key === 'ENABLE_SMART_AGENT') {
+                if (key === 'ENABLE_WEB_SEARCH' || key === 'JELLYFIN_REFRESH_ENABLED' || key === 'ENABLE_TMDB_TOOL' || key === 'ENABLE_OPENLIBRARY_TOOL' || key === 'ENABLE_COMICVINE_TOOL' || key === 'ENABLE_MUSICBRAINZ_TOOL' || key === 'ENABLE_LIBRARY_TOOL' || key === 'ENABLE_PENDING_TOOL' || key === 'ENABLE_SEARCH_QUEUE_TOOL' || key === 'ENABLE_SMART_AGENT') {
                     // Skip - already handled above
                     continue;
                 } else if (key === 'AI_CALL_DELAY_SECONDS') {

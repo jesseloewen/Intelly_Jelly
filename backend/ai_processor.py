@@ -8,6 +8,7 @@ from openai import OpenAI
 from backend.tmdb_api import TMDBClient, format_tool_response
 from backend.openlibrary_api import OpenLibraryClient, format_openlibrary_response
 from backend.comicvine_api import ComicVineClient, format_comicvine_response
+from backend.musicbrainz_api import MusicBrainzClient, format_musicbrainz_response
 from backend.job_store import JobStatus
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ class AIProcessor:
         self.tmdb_client = None
         self.openlibrary_client = None
         self.comicvine_client = None
+        self.musicbrainz_client = None
         
         self.GOOGLE_MODELS = [
             "gemini-2.5-flash",
@@ -100,6 +102,18 @@ class AIProcessor:
             logger.info("Initialized Comic Vine client")
         
         return self.comicvine_client
+    
+    def _get_musicbrainz_client(self) -> Optional[MusicBrainzClient]:
+        """Get or initialize MusicBrainz client if enabled."""
+        mb_enabled = self.config_manager.get('ENABLE_MUSICBRAINZ_TOOL', False)
+        if not mb_enabled:
+            return None
+        
+        if not self.musicbrainz_client:
+            self.musicbrainz_client = MusicBrainzClient()
+            logger.info("Initialized MusicBrainz client")
+        
+        return self.musicbrainz_client
     
     def _get_tmdb_tool_definition_google(self) -> Optional[Dict]:
         """Get TMDB tool definition for Google AI function calling."""
@@ -222,6 +236,98 @@ class AIProcessor:
                             }
                         },
                         "required": ["author_name"]
+                    }
+                }
+            ]
+        }
+    
+    def _get_musicbrainz_tool_definition_google(self) -> Optional[Dict]:
+        """Get MusicBrainz tool definitions for Google AI function calling."""
+        if not self._get_musicbrainz_client():
+            return None
+        
+        return {
+            "function_declarations": [
+                {
+                    "name": "search_music_artist",
+                    "description": "Search for a music artist in MusicBrainz to get accurate name, type, country, and active years. Use this when you need to verify artist information for music file organization.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "artist_name": {
+                                "type": "string",
+                                "description": "The name of the music artist to search for"
+                            }
+                        },
+                        "required": ["artist_name"]
+                    }
+                },
+                {
+                    "name": "search_music_release_group",
+                    "description": "Search for an album/release group in MusicBrainz to get accurate title, artist, first release date, and album type. Use this to verify album information for music file organization.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "release_name": {
+                                "type": "string",
+                                "description": "The name of the album/release to search for"
+                            },
+                            "artist_name": {
+                                "type": "string",
+                                "description": "Optional artist name to narrow search results"
+                            }
+                        },
+                        "required": ["release_name"]
+                    }
+                },
+                {
+                    "name": "search_music_release",
+                    "description": "Search for a specific music release (album, single, EP) in MusicBrainz to get accurate title, artist, release date, track count, and status. Use this when you need specific release details for music file organization.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "release_name": {
+                                "type": "string",
+                                "description": "The name of the release to search for"
+                            },
+                            "artist_name": {
+                                "type": "string",
+                                "description": "Optional artist name to narrow search results"
+                            }
+                        },
+                        "required": ["release_name"]
+                    }
+                },
+                {
+                    "name": "get_music_tracks",
+                    "description": "Get detailed track listing for a music release using its MusicBrainz release ID. Returns all tracks with positions, titles, and durations. Use this when you need track names and numbers for proper music file naming.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "release_id": {
+                                "type": "string",
+                                "description": "The MusicBrainz release ID (MBID) obtained from search_music_release or search_music_release_group"
+                            }
+                        },
+                        "required": ["release_id"]
+                    }
+                },
+                {
+                    "name": "search_music_track",
+                    "description": "Search for a specific music track/recording in MusicBrainz to get accurate title, artist, length, and which releases it appears on. Use this to identify individual tracks from filenames.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "track_name": {
+                                "type": "string",
+                                "description": "The name of the track to search for"
+                            },
+                            "artist_name": {
+                                "type": "string",
+                                "description": "Optional artist name to narrow search results"
+                            }
+                        },
+                        "required": ["track_name"]
                     }
                 }
             ]
@@ -445,6 +551,111 @@ class AIProcessor:
                             }
                         },
                         "required": ["issue_name"]
+                    }
+                }
+            }
+        ]
+    
+    def _get_musicbrainz_tools_for_openai(self) -> List[Dict]:
+        """Get MusicBrainz tool definitions for OpenAI/OpenRouter function calling."""
+        if not self._get_musicbrainz_client():
+            return []
+        
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_music_artist",
+                    "description": "Search for a music artist in MusicBrainz to get accurate name, type, country, and active years. Use this when you need to verify artist information for music file organization.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "artist_name": {
+                                "type": "string",
+                                "description": "The name of the music artist to search for"
+                            }
+                        },
+                        "required": ["artist_name"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_music_release_group",
+                    "description": "Search for an album/release group in MusicBrainz to get accurate title, artist, first release date, and album type. Use this to verify album information for music file organization.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "release_name": {
+                                "type": "string",
+                                "description": "The name of the album/release to search for"
+                            },
+                            "artist_name": {
+                                "type": "string",
+                                "description": "Optional artist name to narrow search results"
+                            }
+                        },
+                        "required": ["release_name"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_music_release",
+                    "description": "Search for a specific music release (album, single, EP) in MusicBrainz to get accurate title, artist, release date, track count, and status. Use this when you need specific release details for music file organization.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "release_name": {
+                                "type": "string",
+                                "description": "The name of the release to search for"
+                            },
+                            "artist_name": {
+                                "type": "string",
+                                "description": "Optional artist name to narrow search results"
+                            }
+                        },
+                        "required": ["release_name"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_music_tracks",
+                    "description": "Get detailed track listing for a music release using its MusicBrainz release ID. Returns all tracks with positions, titles, and durations. Use this when you need track names and numbers for proper music file naming.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "release_id": {
+                                "type": "string",
+                                "description": "The MusicBrainz release ID (MBID) obtained from search_music_release or search_music_release_group"
+                            }
+                        },
+                        "required": ["release_id"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_music_track",
+                    "description": "Search for a specific music track/recording in MusicBrainz to get accurate title, artist, length, and which releases it appears on. Use this to identify individual tracks from filenames.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "track_name": {
+                                "type": "string",
+                                "description": "The name of the track to search for"
+                            },
+                            "artist_name": {
+                                "type": "string",
+                                "description": "Optional artist name to narrow search results"
+                            }
+                        },
+                        "required": ["track_name"]
                     }
                 }
             }
@@ -807,6 +1018,31 @@ class AIProcessor:
                     result = cv_client.search_issue(args.get("issue_name", ""))
                     return format_comicvine_response(result, "issue")
             
+            elif function_name in ("search_music_artist", "search_music_release", "search_music_release_group", "search_music_track", "get_music_tracks"):
+                mb_client = self._get_musicbrainz_client()
+                if not mb_client:
+                    return "MusicBrainz tool is not available"
+                
+                if function_name == "search_music_artist":
+                    result = mb_client.search_artist(args.get("artist_name", ""))
+                    return format_musicbrainz_response(result, "artist")
+                
+                elif function_name == "search_music_release":
+                    result = mb_client.search_release(args.get("release_name", ""), args.get("artist_name"))
+                    return format_musicbrainz_response(result, "release")
+                
+                elif function_name == "search_music_release_group":
+                    result = mb_client.search_release_group(args.get("release_name", ""), args.get("artist_name"))
+                    return format_musicbrainz_response(result, "release_group")
+                
+                elif function_name == "search_music_track":
+                    result = mb_client.search_track(args.get("track_name", ""), args.get("artist_name"))
+                    return format_musicbrainz_response(result, "track")
+                
+                elif function_name == "get_music_tracks":
+                    result = mb_client.get_release_tracks(args.get("release_id", ""))
+                    return format_musicbrainz_response(result, "tracks")
+            
             elif function_name == "search_library":
                 if not self.library_browser:
                     return "Library search tool is not available"
@@ -1052,19 +1288,19 @@ class AIProcessor:
         
         return prompt
 
-    def process_single(self, file_path: str, custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, enable_search_queue_tool: bool = False, enable_agent_tools: bool = False, on_event: Optional[Callable] = None) -> Optional[Dict]:
+    def process_single(self, file_path: str, custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_musicbrainz_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, enable_search_queue_tool: bool = False, enable_agent_tools: bool = False, on_event: Optional[Callable] = None) -> Optional[Dict]:
         """Process a single file using configured AI with optional web search and tools."""
         logger.info(f"Starting AI processing for file: {file_path}")
-        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}, ComicVine tool: {enable_comicvine_tool}, Library tool: {enable_library_tool}, Pending tool: {enable_pending_tool}, Search Queue: {enable_search_queue_tool}, Agent: {enable_agent_tools}")
+        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}, ComicVine tool: {enable_comicvine_tool}, MusicBrainz tool: {enable_musicbrainz_tool}, Library tool: {enable_library_tool}, Pending tool: {enable_pending_tool}, Search Queue: {enable_search_queue_tool}, Agent: {enable_agent_tools}")
         
-        results = self.process_batch([file_path], custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, enable_search_queue_tool, enable_agent_tools, on_event=on_event)
+        results = self.process_batch([file_path], custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_musicbrainz_tool, enable_library_tool, enable_pending_tool, enable_search_queue_tool, enable_agent_tools, on_event=on_event)
         return results[0] if results else None
     
-    def process_batch(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, enable_search_queue_tool: bool = False, enable_agent_tools: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def process_batch(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_musicbrainz_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, enable_search_queue_tool: bool = False, enable_agent_tools: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using configured AI provider with optional web search and tools."""
         logger.info(f"Starting AI processing for {len(file_paths)} file(s)")
         logger.debug(f"Files to process: {file_paths}")
-        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}, ComicVine tool: {enable_comicvine_tool}, Library tool: {enable_library_tool}, Pending tool: {enable_pending_tool}, Search Queue: {enable_search_queue_tool}, Agent: {enable_agent_tools}")
+        logger.debug(f"Custom prompt: {custom_prompt}, Include default: {include_default}, Include filename: {include_filename}, Web search: {enable_web_search}, TMDB tool: {enable_tmdb_tool}, OpenLibrary tool: {enable_openlibrary_tool}, ComicVine tool: {enable_comicvine_tool}, MusicBrainz tool: {enable_musicbrainz_tool}, Library tool: {enable_library_tool}, Pending tool: {enable_pending_tool}, Search Queue: {enable_search_queue_tool}, Agent: {enable_agent_tools}")
         
         # Override enable_tmdb_tool based on actual config state (if not explicitly disabled)
         if enable_tmdb_tool:
@@ -1085,6 +1321,12 @@ class AIProcessor:
                 logger.warning("Comic Vine tool requested but not enabled in config, disabling for this request")
                 enable_comicvine_tool = False
         
+        if enable_musicbrainz_tool:
+            mb_enabled_in_config = self.config_manager.get('ENABLE_MUSICBRAINZ_TOOL', False)
+            if not mb_enabled_in_config:
+                logger.warning("MusicBrainz tool requested but not enabled in config, disabling for this request")
+                enable_musicbrainz_tool = False
+        
         if enable_library_tool:
             library_enabled_in_config = self.config_manager.get('ENABLE_LIBRARY_TOOL', False)
             if not library_enabled_in_config:
@@ -1101,15 +1343,15 @@ class AIProcessor:
         logger.info(f"Using AI provider: {provider}")
         
         if provider == 'openai':
-            return self._process_batch_openai(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, enable_search_queue_tool, enable_agent_tools, on_event=on_event)
+            return self._process_batch_openai(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_musicbrainz_tool, enable_library_tool, enable_pending_tool, enable_search_queue_tool, enable_agent_tools, on_event=on_event)
         elif provider == "openrouter":
-            return self._process_batch_openrouter(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, enable_search_queue_tool, enable_agent_tools, on_event=on_event)
+            return self._process_batch_openrouter(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_musicbrainz_tool, enable_library_tool, enable_pending_tool, enable_search_queue_tool, enable_agent_tools, on_event=on_event)
         elif provider == "ollama":
-            return self._process_batch_ollama(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, enable_search_queue_tool, enable_agent_tools, on_event=on_event)
+            return self._process_batch_ollama(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_musicbrainz_tool, enable_library_tool, enable_pending_tool, enable_search_queue_tool, enable_agent_tools, on_event=on_event)
         elif provider == "google" or provider == "custom":
-            return self._process_batch_google(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_library_tool, enable_pending_tool, enable_search_queue_tool, enable_agent_tools, on_event=on_event)
+            return self._process_batch_google(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_musicbrainz_tool, enable_library_tool, enable_pending_tool, enable_search_queue_tool, enable_agent_tools, on_event=on_event)
     
-    def _process_batch_google(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def _process_batch_google(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_musicbrainz_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using Google AI with optional web search and tools."""
         api_key = self.config_manager.get('GOOGLE_API_KEY', '')
         if not api_key:
@@ -1161,6 +1403,11 @@ class AIProcessor:
             if cv_tool:
                 tools.append(cv_tool)
         
+        if enable_musicbrainz_tool:
+            mb_tool = self._get_musicbrainz_tool_definition_google()
+            if mb_tool:
+                tools.append(mb_tool)
+        
         if enable_library_tool:
             lib_tool = self._get_library_tool_definition_google()
             if lib_tool:
@@ -1192,6 +1439,7 @@ class AIProcessor:
                 if enable_tmdb_tool: tools_active.append("tmdb")
                 if enable_openlibrary_tool: tools_active.append("openlibrary")
                 if enable_comicvine_tool: tools_active.append("comicvine")
+                if enable_musicbrainz_tool: tools_active.append("musicbrainz")
                 if enable_library_tool: tools_active.append("library")
                 if enable_pending_tool: tools_active.append("pending")
                 on_event({"type": "api_request", "provider": "google", "model": model, "tools": tools_active})
@@ -1313,7 +1561,7 @@ class AIProcessor:
                 on_event({"type": "error", "message": str(e)})
             raise
 
-    def _process_batch_openai(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def _process_batch_openai(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_musicbrainz_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using OpenAI with optional web search."""
         api_key = self.config_manager.get('OPENAI_API_KEY', '')
         if not api_key:
@@ -1348,6 +1596,7 @@ class AIProcessor:
                 if enable_tmdb_tool: tools_active.append("tmdb")
                 if enable_openlibrary_tool: tools_active.append("openlibrary")
                 if enable_comicvine_tool: tools_active.append("comicvine")
+                if enable_musicbrainz_tool: tools_active.append("musicbrainz")
                 if enable_library_tool: tools_active.append("library")
                 if enable_pending_tool: tools_active.append("pending")
                 on_event({"type": "api_request", "provider": "openai", "model": model, "tools": tools_active})
@@ -1376,6 +1625,12 @@ class AIProcessor:
                 if cv_tools:
                     tools.extend(cv_tools)
                     use_chat_api = True
+            
+            if enable_musicbrainz_tool:
+                mb_tools = self._get_musicbrainz_tools_for_openai()
+                if mb_tools:
+                    tools.extend(mb_tools)
+                use_chat_api = True
             
             if enable_library_tool:
                 lib_tools = self._get_library_tools_for_openai()
@@ -1528,7 +1783,7 @@ class AIProcessor:
                 on_event({"type": "error", "message": str(e)})
             raise
 
-    def _process_batch_openrouter(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def _process_batch_openrouter(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_musicbrainz_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using OpenRouter (OpenAI-compatible API)."""
         api_key = self.config_manager.get('OPENROUTER_API_KEY', '')
         if not api_key:
@@ -1563,6 +1818,7 @@ class AIProcessor:
                 if enable_tmdb_tool: tools_active.append("tmdb")
                 if enable_openlibrary_tool: tools_active.append("openlibrary")
                 if enable_comicvine_tool: tools_active.append("comicvine")
+                if enable_musicbrainz_tool: tools_active.append("musicbrainz")
                 if enable_library_tool: tools_active.append("library")
                 if enable_pending_tool: tools_active.append("pending")
                 on_event({"type": "api_request", "provider": "openrouter", "model": model, "tools": tools_active})
@@ -1590,6 +1846,12 @@ class AIProcessor:
                 if cv_tools:
                     tools.extend(cv_tools)
                     use_tools = True
+            
+            if enable_musicbrainz_tool:
+                mb_tools = self._get_musicbrainz_tools_for_openai()
+                if mb_tools:
+                    tools.extend(mb_tools)
+                use_tools = True
             
             if enable_library_tool:
                 lib_tools = self._get_library_tools_for_openai()
@@ -1784,7 +2046,7 @@ class AIProcessor:
             logger.error(f"Unexpected error fetching Ollama models: {e}")
             return ["Error: Failed to fetch models"]
     
-    def _process_batch_ollama(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def _process_batch_ollama(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_musicbrainz_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using Ollama."""
         base_url = self.config_manager.get('OLLAMA_BASE_URL', 'http://localhost:11434')
         if not base_url:
@@ -1818,15 +2080,21 @@ class AIProcessor:
                 tmdb_tools = []
             tmdb_tools.extend(cv_tools)
         
+        if enable_musicbrainz_tool:
+            mb_tools = self._get_musicbrainz_tools_for_openai()
+            if not enable_tmdb_tool and not enable_openlibrary_tool and not enable_comicvine_tool:
+                tmdb_tools = []
+            tmdb_tools.extend(mb_tools)
+        
         if enable_library_tool:
             lib_tools = self._get_library_tools_for_openai()
-            if not enable_tmdb_tool and not enable_openlibrary_tool and not enable_comicvine_tool:
+            if not enable_tmdb_tool and not enable_openlibrary_tool and not enable_comicvine_tool and not enable_musicbrainz_tool:
                 tmdb_tools = []
             tmdb_tools.extend(lib_tools)
         
         if enable_pending_tool:
             pend_tools = self._get_pending_tools_for_openai()
-            if not enable_tmdb_tool and not enable_openlibrary_tool and not enable_comicvine_tool and not enable_library_tool:
+            if not enable_tmdb_tool and not enable_openlibrary_tool and not enable_comicvine_tool and not enable_musicbrainz_tool and not enable_library_tool:
                 tmdb_tools = []
             tmdb_tools.extend(pend_tools)
         
@@ -1847,6 +2115,7 @@ class AIProcessor:
                 if enable_tmdb_tool: tools_active.append("tmdb")
                 if enable_openlibrary_tool: tools_active.append("openlibrary")
                 if enable_comicvine_tool: tools_active.append("comicvine")
+                if enable_musicbrainz_tool: tools_active.append("musicbrainz")
                 if enable_library_tool: tools_active.append("library")
                 if enable_pending_tool: tools_active.append("pending")
                 on_event({"type": "api_request", "provider": "ollama", "model": model, "tools": tools_active})
