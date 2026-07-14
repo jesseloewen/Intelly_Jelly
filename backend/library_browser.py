@@ -391,7 +391,7 @@ class LibraryBrowser:
             'tv': 'TV Shows' + os.sep,
             'tv_shows': 'TV Shows' + os.sep,
             'books': 'Books' + os.sep,
-            'comics': 'Books' + os.sep + 'Comics' + os.sep,
+            'comics': 'Comics' + os.sep,
             'audiobooks': 'Books' + os.sep,
             'music': 'Music' + os.sep,
             'software': 'Software' + os.sep,

@@ -44,7 +44,7 @@ You are processing a batch of files that the system has already grouped (by TV s
 4. **Flat Folder Structure (Media):** For Movies, TV Shows, Music, and Books, follow defined folder structures exactly. Extra nesting in the original path must be flattened into the filename using ` - `. Software and Other keep their subfolder structure.
 5. **Detect Media Type from Extension & Context:**
    * `.epub`, `.mobi`, `.pdf`, `.azw3`, `.azw` → eBooks → `Books/`
-   * `.cbz`, `.cbr`, `.cbt` → Comics → `Books/Comics/`
+   * `.cbz`, `.cbr`, `.cbt` → Comics → `Comics/`
    * `.m4b`, `.m4a` → Audiobooks → `Books/`
    * `.mp3`, `.flac`, `.ogg` in Author/Book folders → Audiobooks → `Books/`
    * `.mkv`, `.mp4`, `.avi`, `.mov`, `.wmv` → Movies/TV
@@ -83,7 +83,9 @@ You are processing a batch of files that the system has already grouped (by TV s
 #### 📚 Books
   * **Path:** `Books/[Author]/[Book Title (Year)]/[Book Title (Year)].ext`
   * **Audiobooks:** Same folder: `Books/[Author]/[Book Title (Year)]/NN - Chapter Title.ext`
-  * **Comics:** `Books/Comics/[Series Name (Year)]/Series Name #NNN (Year).ext`
+#### 📖 Comics
+  * **Path:** `Comics/[Series Name (Year)]/Series Name #NNN (Year).ext`
+  * **Year:** First publication year.
   * **Year:** First publication year in folder name and filename.
   * **Author Formatting:** Initials uppercase with spaces: `J. R. R. Tolkien`, NOT `J.R.R. Tolkien`.
   * **Audiobook Chapters:** `NN - Chapter Title.ext` where NN = file position, zero-padded.
