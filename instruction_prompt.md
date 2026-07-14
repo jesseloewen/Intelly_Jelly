@@ -43,10 +43,10 @@ You are processing a batch of files that the system has already grouped (by TV s
 3. **set_names format:** Pass an array of `{original_path, suggested_name, confidence}`. The `original_path` must match exactly the `relative_path` from the input.
 4. **Flat Folder Structure (Media):** For Movies, TV Shows, Music, and Books, follow defined folder structures exactly. Extra nesting in the original path must be flattened into the filename using ` - `. Software and Other keep their subfolder structure.
 5. **Detect Media Type from Extension & Context:**
-   * `.epub`, `.mobi`, `.pdf`, `.azw3`, `.azw` → eBooks → `Books/Books/`
+   * `.epub`, `.mobi`, `.pdf`, `.azw3`, `.azw` → eBooks → `Books/`
    * `.cbz`, `.cbr`, `.cbt` → Comics → `Books/Comics/`
-   * `.m4b`, `.m4a` → Audiobooks → `Books/Audiobooks/`
-   * `.mp3`, `.flac`, `.ogg` in Author/Book folders → Audiobooks
+   * `.m4b`, `.m4a` → Audiobooks → `Books/`
+   * `.mp3`, `.flac`, `.ogg` in Author/Book folders → Audiobooks → `Books/`
    * `.mkv`, `.mp4`, `.avi`, `.mov`, `.wmv` → Movies/TV
    * `.srt`, `.sub`, `.ass`, `.vtt` → Subtitles (match video's base name, same folder)
 6. **Non-Media Files:** `.jpg`, `.png`, `.nfo`, `.txt` in media folders → `Other/`
@@ -81,8 +81,8 @@ You are processing a batch of files that the system has already grouped (by TV s
   * **Tip:** When using `plan_lookups`, declare `musicbrainz` lookups with `{"type": "release_group", "name": "Album Name", "artist": "Artist Name"}` first, then if needed `{"type": "release", "name": "Album Name", "artist": "Artist Name"}` to identify the exact release variant. Use `get_music_tracks` tool (via `search_music_release` then using the release ID) to get the full track list with positions.
 
 #### 📚 Books
-  * **eBooks:** `Books/Books/[Author]/[Book Title (Year)]/Book Title (Year).ext`
-  * **Audiobooks:** `Books/Audiobooks/[Author]/[Book Title (Year)]/NN - Chapter Title.ext`
+  * **Path:** `Books/[Author]/[Book Title (Year)]/[Book Title (Year)].ext`
+  * **Audiobooks:** Same folder: `Books/[Author]/[Book Title (Year)]/NN - Chapter Title.ext`
   * **Comics:** `Books/Comics/[Series Name (Year)]/Series Name #NNN (Year).ext`
   * **Year:** First publication year in folder name and filename.
   * **Author Formatting:** Initials uppercase with spaces: `J. R. R. Tolkien`, NOT `J.R.R. Tolkien`.
