@@ -1351,7 +1351,7 @@ class AIProcessor:
         elif provider == "google" or provider == "custom":
             return self._process_batch_google(file_paths, custom_prompt, include_default, include_filename, enable_web_search, enable_tmdb_tool, enable_openlibrary_tool, enable_comicvine_tool, enable_musicbrainz_tool, enable_library_tool, enable_pending_tool, enable_search_queue_tool, enable_agent_tools, on_event=on_event)
     
-    def _process_batch_google(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_musicbrainz_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def _process_batch_google(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_musicbrainz_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, enable_search_queue_tool: bool = False, enable_agent_tools: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using Google AI with optional web search and tools."""
         api_key = self.config_manager.get('GOOGLE_API_KEY', '')
         if not api_key:
@@ -1561,7 +1561,7 @@ class AIProcessor:
                 on_event({"type": "error", "message": str(e)})
             raise
 
-    def _process_batch_openai(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_musicbrainz_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def _process_batch_openai(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_musicbrainz_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, enable_search_queue_tool: bool = False, enable_agent_tools: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using OpenAI with optional web search."""
         api_key = self.config_manager.get('OPENAI_API_KEY', '')
         if not api_key:
@@ -1783,7 +1783,7 @@ class AIProcessor:
                 on_event({"type": "error", "message": str(e)})
             raise
 
-    def _process_batch_openrouter(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_musicbrainz_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def _process_batch_openrouter(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_musicbrainz_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, enable_search_queue_tool: bool = False, enable_agent_tools: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using OpenRouter (OpenAI-compatible API)."""
         api_key = self.config_manager.get('OPENROUTER_API_KEY', '')
         if not api_key:
@@ -2046,7 +2046,7 @@ class AIProcessor:
             logger.error(f"Unexpected error fetching Ollama models: {e}")
             return ["Error: Failed to fetch models"]
     
-    def _process_batch_ollama(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_musicbrainz_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
+    def _process_batch_ollama(self, file_paths: List[str], custom_prompt: Optional[str] = None, include_default: bool = True, include_filename: bool = True, enable_web_search: bool = False, enable_tmdb_tool: bool = False, enable_openlibrary_tool: bool = False, enable_comicvine_tool: bool = False, enable_musicbrainz_tool: bool = False, enable_library_tool: bool = False, enable_pending_tool: bool = False, enable_search_queue_tool: bool = False, enable_agent_tools: bool = False, on_event: Optional[Callable] = None) -> List[Dict]:
         """Process files using Ollama."""
         base_url = self.config_manager.get('OLLAMA_BASE_URL', 'http://localhost:11434')
         if not base_url:
